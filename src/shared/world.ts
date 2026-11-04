@@ -50,9 +50,9 @@ export function regionOf(t: Terrain, x: number, y: number): number {
 
 /**
  * Candidate settlement sites on land, at least `minGap` apart. The first site is the
- * land point nearest the world centre (Genesis village). Returns [id, x, y, region].
+ * land point nearest the world centre (Genesis village). Returns [id, x, y, region, elevation].
  */
-export function computeSites(seed: number, count = 300, minGap = 38): [number, number, number, number][] {
+export function computeSites(seed: number, count = 300, minGap = 38): [number, number, number, number, number][] {
   const t = makeTerrain(seed);
   const rand = mulberry32((seed ^ 0x5eed) >>> 0);
   const cand: [number, number][] = [];
@@ -68,7 +68,11 @@ export function computeSites(seed: number, count = 300, minGap = 38): [number, n
     if (chosen.every(([x, y]) => (x - c[0]) ** 2 + (y - c[1]) ** 2 >= minGap * minGap)) chosen.push(c);
     if (chosen.length >= count) break;
   }
-  return chosen.map(([x, y], i) => [i + 1, Math.round(x * 10) / 10, Math.round(y * 10) / 10, regionOf(t, x, y)]);
+  return chosen.map(([x, y], i) => {
+    const sx = Math.round(x * 10) / 10;
+    const sy = Math.round(y * 10) / 10;
+    return [i + 1, sx, sy, regionOf(t, x, y), Math.round(t.elevation(sx, sy) * 1e4) / 1e4];
+  });
 }
 
 /** Small deterministic hash → [0,1). */
@@ -78,6 +82,19 @@ export function hash01(a: number, b = 0): number {
   h = Math.imul(h, 0x27d4eb2f);
   h ^= h >>> 15;
   return (h >>> 0) / 4294967296;
+}
+
+/** Buildings are placed around a village by the database, which can't see the coast. Keep them on land. */
+export function settleOnLand(buildings: BuildingTuple[], settlements: { id: number; x: number; y: number }[], terrain: Terrain): BuildingTuple[] {
+  const centres = new Map(settlements.map((s) => [s.id, s]));
+  return buildings.map((b) => {
+    const [id, settlement, kind, x, y] = b;
+    const centre = centres.get(settlement);
+    if (!centre) return b;
+    let k = 1;
+    while (k > 0 && terrain.elevation(centre.x + (x - centre.x) * k, centre.y + (y - centre.y) * k) < 0.02) k -= 0.1;
+    return [id, settlement, kind, centre.x + (x - centre.x) * Math.max(0, k), centre.y + (y - centre.y) * Math.max(0, k)];
+  });
 }
 
 export type BuildingIndex = {
@@ -93,33 +110,4 @@ export function indexBuildings(buildings: BuildingTuple[]): BuildingIndex {
     if (kind !== "home") civic.set(`${settlement}:${kind}`, { x, y });
   }
   return { byId, civic };
-}
-
-const JOB_BUILDING: Record<string, string> = { farmer: "farm", builder: "workshop", healer: "clinic" };
-
-/**
- * Where an agent is during a given tick phase (0 morning, 1 afternoon, 2 evening, 3 night).
- * No coordinates are stored or sent: everyone derives the same answer.
- */
-export function placeFor(
-  a: { id: number; job: string; ageYears: number; home: number | null; settlement: number },
-  phase: number,
-  idx: BuildingIndex,
-  fallback: { x: number; y: number },
-): { x: number; y: number } {
-  const home = (a.home != null && idx.byId.get(a.home)) || null;
-  const civic = (kind: string) => idx.civic.get(`${a.settlement}:${kind}`) ?? null;
-  let target: { x: number; y: number } | null = null;
-  if (phase === 3) target = home;
-  else if (phase === 2) {
-    const r = hash01(a.id, 77);
-    target = r < 0.5 ? home : r < 0.75 ? civic("market") : civic("temple");
-  } else if (a.job === "child" && a.ageYears >= 6) target = civic("school");
-  else if (JOB_BUILDING[a.job]) target = civic(JOB_BUILDING[a.job]);
-  else if (a.job === "elder") target = phase === 0 ? civic("temple") : home;
-  else target = home;
-  const base = target ?? home ?? fallback;
-  const ang = hash01(a.id, phase + 1) * Math.PI * 2;
-  const rad = 0.6 + hash01(a.id, 99) * 2.4;
-  return { x: base.x + Math.cos(ang) * rad, y: base.y + Math.sin(ang) * rad };
 }

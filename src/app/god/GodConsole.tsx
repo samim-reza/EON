@@ -9,6 +9,7 @@ export type GodState = {
   world: {
     tick: number; paused: boolean; genesis_at: string | null; seed: string; last_tick_ms: number; genesis_end_tick: number;
     capacity_k: number; fertility_mult: number; mortality_mult: number; disease_mult: number; crime_mult: number;
+    temp_shift: number; rain_mult: number;
     female_ratio: number; autopilot: boolean;
   };
   population: number;
@@ -176,6 +177,8 @@ export function GodConsole({ state }: { state: GodState }) {
           <Slider name="fertility_mult" label="Fertility" value={w.fertility_mult} min={0} max={5} step={0.05} hint="1 = natural" />
           <Slider name="mortality_mult" label="Mortality" value={w.mortality_mult} min={0.2} max={5} step={0.05} hint="redraws every fate" />
           <Slider name="disease_mult" label="Disease" value={w.disease_mult} min={0} max={5} step={0.05} hint="outbreaks & spread" />
+          <Slider name="temp_shift" label="World temperature" value={w.temp_shift} min={-20} max={20} step={0.5} hint="°C added everywhere: 0 = natural" />
+          <Slider name="rain_mult" label="Rainfall" value={w.rain_mult} min={0} max={4} step={0.05} hint="1 = natural, 0 = endless drought" />
           <Slider name="female_ratio" label="Share of girls at birth" value={w.female_ratio} min={0.3} max={0.7} step={0.01} hint="0.5 = even" />
           <Slider name="capacity_k" label="Land capacity (K)" value={w.capacity_k} min={50} max={200000} step={50} hint="population settles ≈ 1.7 × K" />
           <label className="flex items-center gap-2 text-sm">

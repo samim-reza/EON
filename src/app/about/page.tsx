@@ -41,6 +41,24 @@ export default function About() {
         ))}
       </div>
 
+      <h2 className="mt-10 text-xl font-semibold">Sun, moon and weather</h2>
+      <p className="mt-2 text-ink-2">
+        EON is a real planet. The map runs from the Arctic at the top to the equator at the bottom, with ice, tundra,
+        pine forest, grassland, desert, savanna and jungle wherever warmth and rain put them. The sun climbs higher in
+        summer and days grow longer, with a midnight sun in the far north. Dawn sweeps from east to west, and the moon
+        goes through its phases every 29.5 days. Its pull moves the sea: tides rise and fall twice a day, and run
+        strongest at full and new moon. Rain runs downhill into rivers and lakes on its way to the sea.
+      </p>
+      <p className="mt-2 text-ink-2">
+        Weather systems drift across the land: rain, snow, fog, thunderstorms, blizzards and sandstorms, with
+        heatwaves and cold snaps. People live by it. They sleep at night, work by day and shelter from storms. Warmth
+        and rain grow the crops, a good harvest fills the stores and a failed one makes food dear. Long grey spells
+        lower spirits, fierce heat and deep cold wear on the old and the very young, and flu follows the cold.
+        Villages by a river can water their fields through a drought, but rivers flood, and a storm on a spring tide
+        can drive the sea ashore. People dress for the day, from straw hats and desert robes to raincoats and fur
+        parkas. Warm clothes cost money, so the poor feel the cold first.
+      </p>
+
       <h2 className="mt-10 text-xl font-semibold">The Creator</h2>
       <p className="mt-2 text-ink-2">
         EON has exactly one God — The Creator — who made the first two souls. During the first thirty years, The

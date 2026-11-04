@@ -17,11 +17,14 @@ const COLORS: Record<string, string> = {
   founded: "text-life",
   became_town: "text-life",
   became_city: "text-life",
+  weather: "text-sick",
+  harvest: "text-god",
 };
 
 const ICONS: Record<string, string> = {
   birth: "✦", death: "✝", union: "♥", wedding: "◈", pregnant: "◌", diagnosis: "⚕", outbreak: "☣",
   genesis: "☀", founders_arrive: "☀", founder_created: "☀", miracle_heal: "✧", founded: "⌂", became_town: "⌂", became_city: "⌂",
+  weather: "☁", harvest: "❧",
 };
 
 function A({ id, name }: { id: number | null; name: string | null }) {
@@ -31,6 +34,32 @@ function A({ id, name }: { id: number | null; name: string | null }) {
       {name}
     </Link>
   );
+}
+
+function weatherStory(d: Record<string, string | number | boolean | undefined>, place: React.ReactNode) {
+  const at = place ? <> {place}</> : null;
+  switch (d.kind) {
+    case "blizzard":
+      return <>A blizzard buried{at ?? " the land"} in snow</>;
+    case "flood":
+      return <>Days of heavy rain flooded{at ?? " the lowlands"} as the river rose</>;
+    case "heatwave":
+      return <>A heatwave scorched{at ?? " the land"}: {String(d.high)}°C</>;
+    case "cold_snap":
+      return <>Bitter cold gripped{at ?? " the land"}: {String(d.low)}°C</>;
+    case "drought":
+      return <>Drought took hold{place ? <> in {place}</> : null} as the soil dried out</>;
+    case "surge":
+      return <>A storm and a spring tide drove the sea into{at ?? " the coast"}</>;
+    case "sandstorm":
+      return <>A sandstorm swept through{at ?? " the desert"}</>;
+    case "storm":
+      return <>A thunderstorm broke over{at ?? " the land"}</>;
+    case "first_snow":
+      return <>The first snow of the year fell{place ? <> on {place}</> : null}</>;
+    default:
+      return <>The weather turned{place ? <> in {place}</> : null}</>;
+  }
 }
 
 export function describe(e: FeedEvent) {
@@ -61,6 +90,10 @@ export function describe(e: FeedEvent) {
       return <>The Creator made {a}</>;
     case "miracle_heal":
       return <>The Creator healed {a}</>;
+    case "weather":
+      return <>{weatherStory(d, place)}</>;
+    case "harvest":
+      return <>{d.good ? <>A bumper harvest filled the stores{place ? <> of {place}</> : null}</> : <>The harvest failed{place ? <> in {place}</> : null}: food will be dear this year</>}</>;
     case "founded":
       return <>The village of <span className="text-life">{String(d.name)}</span> was founded</>;
     case "became_town":

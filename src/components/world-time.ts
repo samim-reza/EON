@@ -84,3 +84,24 @@ export function currentTick(): number | null {
   const { now, anchor } = snapshot;
   return now && anchor ? tickAt(anchor, performance.now(), now.paused) : null;
 }
+
+export type Focus = { name: string; x: number; y: number };
+
+let focus: Focus | null = null;
+const focusListeners = new Set<() => void>();
+
+/** The place the map is showing, so the clock can report the weather there. */
+export function setFocus(next: Focus) {
+  if (focus?.name === next.name) return;
+  focus = next;
+  focusListeners.forEach((listener) => listener());
+}
+
+function subscribeFocus(listener: () => void) {
+  focusListeners.add(listener);
+  return () => {
+    focusListeners.delete(listener);
+  };
+}
+
+export const useFocus = () => useSyncExternalStore(subscribeFocus, () => focus, () => null);

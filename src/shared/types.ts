@@ -22,6 +22,8 @@ export type NowState = {
   lastTickMs: number;
   stats: StatsRow | null;
   settlements: number;
+  /** God's climate sliders. Absent until the climate migration has run. */
+  tune?: { tempShift: number; rainMult: number };
 };
 
 export type FeedEvent = {
@@ -68,6 +70,8 @@ export type Settlement = {
   region: number;
   founded: number;
   pop: number;
+  /** Food stores: 1 is a normal year. */
+  food?: number;
 };
 
 /** [id, settlementId, kind, x, y] */
@@ -102,7 +106,7 @@ export type AgentDetail = {
   occupation: string | null;
   kids: number;
   isPlayer: boolean;
-  settlement: { id: number; name: string; kind: string } | null;
+  settlement: { id: number; name: string; kind: string; x?: number; y?: number; food?: number } | null;
   mother: PersonRef | null;
   father: PersonRef | null;
   partner?: PersonRef | null;
@@ -115,6 +119,8 @@ export type AgentDetail = {
   diagnosed?: string | null;
   homeId?: number | null;
   pregnant?: boolean;
+  /** When the baby is due, so the wait is visible. */
+  dueTick?: number | null;
   sick?: string[];
   children: PersonRef[];
   story: StoryEntry[];

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { describe } from "@/components/EventLine";
-import { LiveAge } from "@/components/WorldClock";
+import { LiveActivity, LiveAge, LiveDue } from "@/components/WorldClock";
 import { pub } from "@/lib/pub";
 import { formatAge, formatEonDate } from "@/shared/time";
 import type { AgentDetail, FeedEvent } from "@/shared/types";
@@ -79,6 +79,11 @@ export default async function AgentPage(props: PageProps<"/agents/[id]">) {
               <>
                 <LiveAge birthTick={a.birthTick} fallback={formatAge(a.age)} /> old · {a.occupation} in {a.settlement?.name ?? "the wilds"}
                 {a.pregnant ? " · expecting a child" : ""}
+                {a.pregnant && a.dueTick != null ? (
+                  <>
+                    {" "}· <LiveDue dueTick={a.dueTick} />
+                  </>
+                ) : null}
               </>
             ) : (
               <>
@@ -87,6 +92,15 @@ export default async function AgentPage(props: PageProps<"/agents/[id]">) {
               </>
             )}
           </p>
+          {a.alive && a.settlement?.x != null && a.settlement.y != null && (
+            <p className="mt-1 text-sm text-ink-3">
+              <LiveActivity
+                person={{ id: a.id, job: a.occupation ?? "adult", birth: a.birthTick }}
+                place={{ name: a.settlement.name, x: a.settlement.x, y: a.settlement.y }}
+                showWeather
+              />
+            </p>
+          )}
         </div>
         <Link href={`/family/${a.id}`} prefetch={false} className="btn btn-ghost">
           Family tree

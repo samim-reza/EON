@@ -60,6 +60,9 @@ npx tsx scripts/dev-seed.ts 4242 25 | docker exec -i supabase_db_EON psql -U pos
 | You want to change | Look in |
 |---|---|
 | How agents live and die | `supabase/migrations/`, and `src/shared/params/demography.json` for the numbers |
+| Climate, weather, sun and moon | `src/shared/climate.ts` and its SQL twin `sim.weather_at`. Change both, then run `npx tsx scripts/climate-golden.ts` and update the block it prints in `supabase/tests/eon_test.sql` |
+| The daily routine and clothing | `src/shared/daily-life.ts` |
+| Rivers and lakes | `src/shared/rivers.ts` |
 | What the public API returns | `api.pub_*` in the migrations, and `src/app/api/pub/` |
 | The map | `src/components/map/` and `src/shared/world.ts` |
 | Pages | `src/app/` |

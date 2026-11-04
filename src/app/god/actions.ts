@@ -4,7 +4,7 @@ import { randomInt } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createUserClient } from "@/lib/supabase/server";
-import { computeSites } from "@/shared/world";
+import { sitesWithWater } from "@/shared/rivers";
 
 export type ActionResult = { ok: boolean; error: string | null; data?: unknown };
 
@@ -59,7 +59,7 @@ export async function genesis(_prev: ActionResult, form: FormData): Promise<Acti
   const parsed = genesisSchema.safeParse(Object.fromEntries(form));
   if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Invalid names");
   const seed = randomInt(1, 2_147_483_647);
-  const sites = computeSites(seed);
+  const sites = sitesWithWater(seed);
   if (sites.length < 40) return fail("This seed produced too little land — try again.");
   const p = parsed.data;
   return godRpc("god_genesis", {
@@ -74,6 +74,8 @@ const worldSchema = z.object({
   fertility_mult: z.coerce.number().min(0).max(5),
   mortality_mult: z.coerce.number().min(0.2).max(5),
   disease_mult: z.coerce.number().min(0).max(5),
+  temp_shift: z.coerce.number().min(-20).max(20),
+  rain_mult: z.coerce.number().min(0).max(4),
   female_ratio: z.coerce.number().min(0.3).max(0.7),
   capacity_k: z.coerce.number().int().min(50).max(200_000),
   autopilot: z.enum(["on", "off"]),

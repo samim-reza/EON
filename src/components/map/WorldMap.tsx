@@ -2,12 +2,17 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { LiveAge, WorldClock } from "@/components/WorldClock";
-import { currentTick, useWorld } from "@/components/world-time";
+import { LiveActivity, LiveAge, WorldClock } from "@/components/WorldClock";
+import { climateOf } from "@/components/local-climate";
+import { currentTick, setFocus, useWorld } from "@/components/world-time";
+import { localHour, NO_TUNING, seasonCurve, smooth, tideAt, weatherAt, yearFraction, type Weather } from "@/shared/climate";
+import { outfitFor, planFor, slotInfo, SLOTS_PER_TICK, spotFor, type Outfit, type Plan } from "@/shared/daily-life";
+import { TILE_UNITS } from "@/shared/terrain-pixels";
 import { FLAG_FOUNDER, FLAG_PLAYER, FLAG_PREGNANT, FLAG_SICK, type Geo, type Roster } from "@/shared/types";
 import { lifeStage } from "@/shared/time";
-import { indexBuildings, placeFor, WORLD_SIZE, type BuildingIndex } from "@/shared/world";
-import { loadTerrain } from "./terrain";
+import { hash01, indexBuildings, makeTerrain, settleOnLand, WORLD_SIZE, type BuildingIndex } from "@/shared/world";
+import { createAtmosphere, type Atmosphere } from "./atmosphere";
+import { loadTerrain, setTide, tilesFor, type TerrainMap } from "./terrain";
 
 type Agent = {
   id: number; name: string; sex: "F" | "M"; birth: number; settlement: number; home: number | null;
@@ -22,6 +27,8 @@ type Group = { x: number; y: number; radius: number; agents: Agent[] };
 const HERO_HOLD_S = 26; // seconds at each settlement in the landing-page tour
 const HERO_TRAVEL_S = 7; // of which the last few are spent travelling to the next one
 const HERO_TERRAIN_RES = 1.5; // coarser than the full map: it sits behind text, and it loads faster
+const TILES_FROM_ZOOM = 2.4; // the single map image is sharp enough below this
+const HERO_NIGHT_LIFT = 0.1; // the landing page stays readable at midnight
 
 function unpack(r: Roster): Agent[] {
   return r.id.map((id, i) => ({
@@ -31,6 +38,73 @@ function unpack(r: Roster): Agent[] {
 }
 
 const ease = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+
+/** A warm window glow, drawn once and stamped over every lit building. */
+function makeGlow() {
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 48;
+  const ctx = canvas.getContext("2d")!;
+  const glow = ctx.createRadialGradient(24, 24, 0, 24, 24, 24);
+  glow.addColorStop(0, "rgba(255, 214, 140, 0.95)");
+  glow.addColorStop(0.25, "rgba(255, 176, 92, 0.42)");
+  glow.addColorStop(1, "rgba(255, 150, 60, 0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, 48, 48);
+  return canvas;
+}
+
+/** Homes light up at dusk and go dark as people go to bed. Lamps at public buildings burn all night. */
+function windowLit(id: number, kind: string, hour: number) {
+  if (kind !== "home") return true;
+  return hour >= 15 ? hour < 21 + 2.6 * hash01(id, 3) : hour >= 4.8 + 2 * hash01(id, 3);
+}
+
+const SKINS = ["#f1d3b8", "#e0b48e", "#c68f63", "#9a6a45", "#6f4a31"];
+const FIGURES_FROM_ZOOM = 6.5; // close enough to see what people are wearing
+
+/** A tiny dressed person, for close zoom. Their sex colour stays as a ring at their feet. */
+function drawFigure(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, outfit: Outfit, skin: string, ring: string) {
+  ctx.fillStyle = "rgba(0, 0, 0, 0.3)";
+  ctx.beginPath();
+  ctx.ellipse(x + r * 0.2, y + r * 1.02, r * 0.72, r * 0.26, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = ring;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.ellipse(x, y + r, r * 0.62, r * 0.22, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = outfit.colour;
+  ctx.beginPath();
+  ctx.moveTo(x - r * 0.58, y + r);
+  ctx.lineTo(x + r * 0.58, y + r);
+  ctx.lineTo(x + r * 0.4, y - r * 0.28);
+  ctx.lineTo(x - r * 0.4, y - r * 0.28);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = skin;
+  ctx.beginPath();
+  ctx.arc(x, y - r * 0.68, r * 0.42, 0, Math.PI * 2);
+  ctx.fill();
+  if (outfit.headwear === "hood" || outfit.headwear === "wrap" || outfit.headwear === "wool") {
+    ctx.fillStyle = outfit.headwear === "wool" ? "#8c3b3b" : outfit.colour;
+    ctx.beginPath();
+    ctx.arc(x, y - r * 0.72, r * 0.46, Math.PI, 0);
+    ctx.fill();
+  } else if (outfit.headwear === "straw") {
+    ctx.fillStyle = "#d8bf6a";
+    ctx.beginPath();
+    ctx.ellipse(x, y - r * 0.92, r * 0.72, r * 0.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  if (outfit.umbrella) {
+    ctx.fillStyle = "#b5473f";
+    ctx.beginPath();
+    ctx.arc(x, y - r * 1.15, r * 0.95, Math.PI, 0);
+    ctx.fill();
+  }
+}
+
+const ROOFS: Record<string, string> = { home: "#a8694e", temple: "#c9a44e", clinic: "#8fc4bd", farm: "#b08a4a", market: "#b5604a", school: "#8d7fb0" };
 
 export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
   const hero = variant === "hero";
@@ -46,7 +120,10 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
   const [ready, setReady] = useState(false);
   const [stop, setStop] = useState<{ name: string; pop: number } | null>(null);
   const cam = useRef<Cam>({ x: 500, y: 500, z: 3 });
-  const terrain = useRef<HTMLCanvasElement | null>(null);
+  const terrain = useRef<TerrainMap | null>(null);
+  const atmosphere = useRef<{ seed: number; value: Atmosphere } | null>(null);
+  const tune = useRef(NO_TUNING);
+  const glow = useRef<HTMLCanvasElement | null>(null);
   const placed = useRef(false);
   const onScreen = useRef(true);
 
@@ -69,7 +146,10 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
       });
   }, [now]);
 
-  const idx: BuildingIndex | null = useMemo(() => (geo ? indexBuildings(geo.buildings) : null), [geo]);
+  const idx: BuildingIndex | null = useMemo(
+    () => (geo ? indexBuildings(settleOnLand(geo.buildings, geo.settlements, makeTerrain(Number(geo.seed)))) : null),
+    [geo],
+  );
   const settlementById = useMemo(() => new Map((geo?.settlements ?? []).map((s) => [s.id, s])), [geo]);
 
   const groups = useMemo<Group[]>(() => {
@@ -95,9 +175,11 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
   useEffect(() => {
     if (!geo) return;
     let live = true;
-    void loadTerrain(Number(geo.seed), hero ? HERO_TERRAIN_RES : 1).then((canvas) => {
+    const seed = Number(geo.seed);
+    if (atmosphere.current?.seed !== seed) atmosphere.current = { seed, value: createAtmosphere(seed) };
+    void loadTerrain(seed, hero ? HERO_TERRAIN_RES : 1).then((map) => {
       if (!live) return;
-      terrain.current = canvas;
+      terrain.current = map;
       setReady(true);
     });
     if (!placed.current && geo.settlements.length) {
@@ -109,6 +191,10 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
       live = false;
     };
   }, [geo, hero]);
+
+  useEffect(() => {
+    tune.current = now?.tune ?? NO_TUNING;
+  }, [now?.tune]);
 
   // The landing page must not spend the battery of someone reading further down.
   useEffect(() => {
@@ -122,20 +208,47 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
   }, [hero]);
 
   // --- rendering ------------------------------------------------------------------
-  const positionOf = useCallback(
-    (a: Agent, tf: number) => {
-      if (!idx) return { x: 0, y: 0 };
-      const s = settlementById.get(a.settlement);
-      const fallback = s ? { x: s.x, y: s.y } : { x: 500, y: 500 };
-      const cur = Math.floor(tf);
-      const ageYears = (tf - a.birth) / 1440;
-      const base = { id: a.id, job: a.job, ageYears, home: a.home, settlement: a.settlement };
-      const to = placeFor(base, ((cur % 4) + 4) % 4, idx, fallback);
-      const from = placeFor(base, (((cur - 1) % 4) + 4) % 4, idx, fallback);
-      const k = ease(Math.min(1, (tf - cur) / 0.45)); // commute during the first ~27 s of each tick
-      return { x: from.x + (to.x - from.x) * k, y: from.y + (to.y - from.y) * k };
+  const seed = geo ? Number(geo.seed) : 0;
+  const weatherCache = useRef(new Map<number, Weather>());
+
+  /** A settlement's weather on a half-hour slot: everyone there checks the same sky, once. */
+  const weatherFor = useCallback(
+    (settlement: number, x: number, y: number, slot: number) => {
+      const key = slot * 4096 + settlement;
+      const cache = weatherCache.current;
+      let weather = cache.get(key);
+      if (!weather) {
+        weather = weatherAt(seed, climateOf(seed, x, y), x, y, slot / SLOTS_PER_TICK, tune.current);
+        if (cache.size > 1500) cache.clear();
+        cache.set(key, weather);
+      }
+      return weather;
     },
-    [idx, settlementById],
+    [seed],
+  );
+
+  const positionOf = useCallback(
+    (a: Agent, tf: number): { x: number; y: number; plan: Plan | null; moving: boolean; weather: Weather | null } => {
+      if (!idx) return { x: 0, y: 0, plan: null, moving: false, weather: null };
+      const s = settlementById.get(a.settlement);
+      const home = s ? { x: s.x, y: s.y } : { x: 500, y: 500 };
+      const person = { id: a.id, job: a.job, ageYears: (tf - a.birth) / 1440 };
+      const position = tf * SLOTS_PER_TICK;
+      const slot = Math.floor(position);
+      const planAt = (n: number) => {
+        const info = slotInfo(n, home.x);
+        return planFor(person, info.hour, info.day, info.month, weatherFor(a.settlement, home.x, home.y, n));
+      };
+      const plan = planAt(slot);
+      const before = planAt(slot - 1);
+      const weather = weatherFor(a.settlement, home.x, home.y, slot);
+      const to = spotFor(a, plan, idx, home);
+      if (before.place === plan.place) return { ...to, plan, moving: false, weather };
+      const from = spotFor(a, before, idx, home);
+      const k = ease(position - slot);
+      return { x: from.x + (to.x - from.x) * k, y: from.y + (to.y - from.y) * k, plan, moving: true, weather };
+    },
+    [idx, settlementById, weatherFor],
   );
 
   useEffect(() => {
@@ -147,9 +260,12 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
     let raf = 0;
     let last = 0;
     let shownStop = "";
+    let lastFocusCheck = 0;
+    glow.current ??= makeGlow();
     const draw = (ts: number) => {
       raf = requestAnimationFrame(draw);
       if (ts - last < (hero ? 50 : 33) || !onScreen.current) return; // 20 fps behind the headline, 30 on the map
+      const elapsed = Math.min(100, ts - last);
       last = ts;
       const dpr = Math.min(hero ? 1.5 : 2, window.devicePixelRatio || 1);
       const W = wrap.clientWidth;
@@ -180,26 +296,56 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
         const far = Math.min(1, Math.hypot(to.x - from.x, to.y - from.y) / 150);
         c.x = from.x + (to.x - from.x) * k + Math.cos(secs / 19) * 4;
         c.y = from.y + (to.y - from.y) * k + Math.sin(secs / 27) * 3;
-        c.z = (wide ? 7 : 5.5) * (1 - 0.6 * far * Math.sin(Math.PI * k)) + Math.sin(secs / 31) * 0.3;
+        c.z = (wide ? 7.5 : 6.8) * (1 - 0.6 * far * Math.sin(Math.PI * k)) + Math.sin(secs / 31) * 0.3;
         const at = k < 0.5 ? from : to;
         const label = `${at.id}:${at.pop}`;
         if (label !== shownStop) {
           shownStop = label;
           setStop({ name: at.name, pop: at.pop });
+          setFocus({ name: at.name, x: at.x, y: at.y });
         }
       }
       // The hero keeps the village clear of the headline and of the feed.
-      const focusX = W * (hero && wide ? 0.6 : 0.5);
+      const focusX = W * (hero ? (wide ? 0.6 : 0.3) : 0.5); // on phones, the space left of the clock
       const focusY = hero ? (wide ? H * 0.36 : 130) : H * 0.5; // on phones, the strip above the headline
       const sx = (x: number) => (x - c.x) * c.z + focusX;
       const sy = (y: number) => (y - c.y) * c.z + focusY;
 
-      ctx.fillStyle = "#070b14";
+      ctx.fillStyle = "rgb(8, 22, 46)"; // the open ocean, which is also the colour at the edge of the map
       ctx.fillRect(0, 0, W, H);
+      const view = { x0: c.x - focusX / c.z, y0: c.y - focusY / c.z, x1: c.x + (W - focusX) / c.z, y1: c.y + (H - focusY) / c.z };
+      if (!hero && ts - lastFocusCheck > 700 && geo?.settlements.length) {
+        lastFocusCheck = ts;
+        const nearest = geo.settlements.reduce((best, s) => (Math.hypot(s.x - c.x, s.y - c.y) < Math.hypot(best.x - c.x, best.y - c.y) ? s : best));
+        setFocus({ name: nearest.name, x: nearest.x, y: nearest.y });
+      }
       if (terrain.current) {
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = "high";
-        ctx.drawImage(terrain.current, sx(0), sy(0), WORLD_SIZE * c.z, WORLD_SIZE * c.z);
+        ctx.drawImage(terrain.current.base, sx(0), sy(0), WORLD_SIZE * c.z, WORLD_SIZE * c.z);
+        if (c.z >= TILES_FROM_ZOOM && geo) {
+          const span = TILE_UNITS * c.z + 0.6; // a hair of overlap hides the seams
+          const sea = 128 + 88 * tideAt(Number(geo.seed), tf, c.x); // the same sea level across the view
+          let tideDone = false; // one tile a frame, so a long coast never causes a stutter
+          for (const { x, y, tile } of tilesFor(Number(geo.seed), view.x0, view.y0, view.x1, view.y1)) {
+            if (!tideDone) tideDone = setTide(tile, sea);
+            ctx.globalAlpha = reducedMotion ? 1 : Math.min(1, (performance.now() - tile.born) / 350);
+            ctx.drawImage(tile.canvas, sx(x * TILE_UNITS), sy(y * TILE_UNITS), span, span);
+          }
+          ctx.globalAlpha = 1;
+        }
+        // The year turns: leaves go gold, then snow settles from the cold places outward.
+        const autumn = Math.exp(-(((yearFraction(tf) - 0.66) / 0.085) ** 2));
+        if (autumn > 0.02) {
+          ctx.globalAlpha = autumn;
+          ctx.drawImage(terrain.current.autumn, sx(0), sy(0), WORLD_SIZE * c.z, WORLD_SIZE * c.z);
+        }
+        const snow = smooth(-0.1, -0.8, seasonCurve(tf));
+        if (snow > 0.02) {
+          ctx.globalAlpha = snow;
+          ctx.drawImage(terrain.current.snow, sx(0), sy(0), WORLD_SIZE * c.z, WORLD_SIZE * c.z);
+        }
+        ctx.globalAlpha = 1;
       }
 
       // buildings
@@ -209,8 +355,34 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
           const y = sy(b.y);
           if (x < -10 || y < -10 || x > W + 10 || y > H + 10) continue;
           const s = Math.max(2, c.z * (b.kind === "home" ? 0.9 : 1.6));
-          ctx.fillStyle = b.kind === "home" ? "#6b5b4a" : b.kind === "temple" ? "#b8964a" : b.kind === "clinic" ? "#7aa8a3" : "#56657d";
+          ctx.fillStyle = "rgba(0, 0, 0, 0.32)";
+          ctx.fillRect(x - s / 2 + s * 0.2, y - s / 2 + s * 0.2, s, s);
+          ctx.fillStyle = ROOFS[b.kind] ?? "#74839b";
           ctx.fillRect(x - s / 2, y - s / 2, s, s);
+          ctx.fillStyle = "rgba(255, 255, 255, 0.2)";
+          ctx.fillRect(x - s / 2, y - s / 2, s, s * 0.42); // the sunlit side of the roof
+        }
+      }
+
+      // sky: clouds, the light of the hour, then what shines through the dark
+      const sky = atmosphere.current?.value;
+      if (sky) {
+        sky.update(view, tf, c.z, tune.current, ts, hero ? HERO_NIGHT_LIFT : 0);
+        sky.drawSky(ctx, sx, sy);
+        const night = 1 - sky.daylight;
+        if (idx && glow.current && night > 0.12 && c.z >= 1.4) {
+          ctx.globalCompositeOperation = "lighter";
+          for (const [id, b] of idx.byId) {
+            const x = sx(b.x);
+            const y = sy(b.y);
+            if (x < -40 || y < -40 || x > W + 40 || y > H + 40) continue;
+            if (!windowLit(id, b.kind, localHour(tf, b.x))) continue;
+            const size = Math.min(44, c.z * (b.kind === "home" ? 2.6 : 4.2));
+            ctx.globalAlpha = night * (0.62 + 0.38 * hash01(id, 5));
+            ctx.drawImage(glow.current, x - size / 2, y - size / 2, size, size);
+          }
+          ctx.globalAlpha = 1;
+          ctx.globalCompositeOperation = "source-over";
         }
       }
 
@@ -228,6 +400,24 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
           const y = sy(p.y);
           if (x < -5 || y < -5 || x > W + 5 || y > H + 5) continue;
           const stage = lifeStage((tf - a.birth) / 1440);
+          if (c.z >= FIGURES_FROM_ZOOM && p.plan && p.weather && !p.plan.asleep && stage !== "baby") {
+            const size = Math.min(11, Math.max(4.6, c.z * 0.56)) * (stage === "child" ? 0.78 : 1);
+            const person = { id: a.id, job: a.job, ageYears: (tf - a.birth) / 1440 };
+            const biome = climateOf(seed, settlementById.get(a.settlement)?.x ?? 500, settlementById.get(a.settlement)?.y ?? 500).biome;
+            ctx.globalAlpha = p.plan.indoors && !p.moving ? 0.8 : 1;
+            drawFigure(ctx, x, y, size, outfitFor(person, p.plan, p.weather, biome), SKINS[Math.floor(hash01(a.id, 53) * SKINS.length)], a.sex === "F" ? "#e58bd5" : "#4fd1c5");
+            if (a.flags & (FLAG_SICK | FLAG_PREGNANT | FLAG_PLAYER | FLAG_FOUNDER)) {
+              ctx.lineWidth = 1;
+              ctx.strokeStyle = a.flags & FLAG_PLAYER ? "#ffffff" : a.flags & FLAG_SICK ? "#d9a441" : a.flags & FLAG_PREGNANT ? "#ffb3ec" : "#f5b84b";
+              ctx.beginPath();
+              ctx.arc(x, y, size * 1.5, 0, Math.PI * 2);
+              ctx.stroke();
+            }
+            ctx.globalAlpha = 1;
+            if (hero) labels.push({ x, y: y - size, name: a.name, d: (x - focusX) ** 2 + (y - focusY) ** 2 });
+            continue;
+          }
+          ctx.globalAlpha = p.plan?.asleep ? 0.4 : p.plan?.indoors && !p.moving ? 0.72 : 1; // people indoors are dimmer
           ctx.beginPath();
           ctx.arc(x, y, stage === "baby" ? r * 0.6 : stage === "child" ? r * 0.8 : r, 0, Math.PI * 2);
           ctx.fillStyle = stage === "elder" ? "#c9d1dc" : a.sex === "F" ? "#e58bd5" : "#4fd1c5";
@@ -237,21 +427,20 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
             ctx.strokeStyle = a.flags & FLAG_PLAYER ? "#ffffff" : a.flags & FLAG_SICK ? "#d9a441" : a.flags & FLAG_PREGNANT ? "#ffb3ec" : "#f5b84b";
             ctx.stroke();
           }
+          ctx.globalAlpha = 1;
           if (hero) labels.push({ x, y, name: a.name, d: (x - focusX) ** 2 + (y - focusY) ** 2 });
         }
       }
 
-      // night
-      const phase = ((Math.floor(tf) % 4) + 4) % 4;
-      const dark = [0.08, 0, 0.22, 0.42][phase] * (hero ? 0.6 : 1);
-      if (dark) {
-        ctx.fillStyle = `rgba(4, 8, 24, ${dark})`;
-        ctx.fillRect(0, 0, W, H);
+      if (sky && !reducedMotion) {
+        sky.drawPrecipitation(ctx, W, H, view, elapsed, c.z);
+        sky.drawLightning(ctx, W, H, ts);
       }
 
       // settlements
       ctx.font = "600 12px var(--font-geist-sans), system-ui";
       ctx.textAlign = "center";
+      const taken: { x: number; y: number }[] = [];
       for (const s of geo?.settlements ?? []) {
         const x = sx(s.x);
         const y = sy(s.y);
@@ -265,18 +454,20 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
         }
         ctx.fillStyle = "rgba(230, 236, 245, 0.9)";
         ctx.fillText(`${s.name} · ${s.pop}`, x, y - Math.max(10, c.z * 9));
+        taken.push({ x, y: y - Math.max(10, c.z * 9) });
       }
 
       // people have names: the hero introduces a few of them
       if (labels.length) {
         ctx.font = "500 11px var(--font-geist-sans), system-ui";
         ctx.fillStyle = "rgba(230, 236, 245, 0.85)";
-        const placed: { x: number; y: number }[] = [];
+        const shown = taken.length;
         for (const l of labels.sort((a, b) => a.d - b.d)) {
-          if (placed.length === 5) break;
-          if (placed.some((o) => Math.abs(o.x - l.x) < 70 && Math.abs(o.y - l.y) < 15)) continue; // no overlapping names
-          placed.push(l);
-          ctx.fillText(l.name, l.x, l.y - r - 5);
+          if (taken.length - shown === 5) break;
+          const y = l.y - r - 5;
+          if (taken.some((o) => Math.abs(o.x - l.x) < 74 && Math.abs(o.y - y) < 15)) continue; // no overlapping names
+          taken.push({ x: l.x, y });
+          ctx.fillText(l.name, l.x, y);
         }
       }
 
@@ -292,7 +483,7 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
     };
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
-  }, [agents, geo, groups, hero, idx, now?.tick, positionOf, selected, follow, stops]);
+  }, [agents, geo, groups, hero, idx, now?.tick, positionOf, seed, selected, settlementById, follow, stops]);
 
   // --- interaction ------------------------------------------------------------------
   const pointers = useRef(new Map<number, { x: number; y: number }>());
@@ -479,6 +670,11 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
               <div className="text-ink-2">
                 <LiveAge birthTick={selected.birth} /> · {selected.job} · {settlementById.get(selected.settlement)?.name}
               </div>
+              {settlementById.get(selected.settlement) && (
+                <div className="mt-1 text-xs text-ink-3">
+                  <LiveActivity person={selected} place={settlementById.get(selected.settlement)!} />
+                </div>
+              )}
             </div>
             <button onClick={() => { setSelected(null); setFollow(false); }} className="text-ink-3 hover:text-ink" aria-label="Close">
               ✕

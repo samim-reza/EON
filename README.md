@@ -119,6 +119,29 @@ Babies become children, children become teens, and adults work as **farmers, bui
 and spending credits. Elders retire. Villages are founded as the population spreads, become **towns at 200
 people** and **cities at 2,000**.
 
+### Climate and weather
+
+EON is a real planet, and its climate shapes every life.
+
+- **Biomes:** the map runs from the Arctic to the equator. Latitude, altitude and rain belts produce ice, tundra,
+  pine forest, grassland, forest, desert, savanna and jungle.
+- **Sky:** the sun follows real solar geometry, with long summer days and a midnight sun in the north. Dawn sweeps
+  from east to west. The moon goes through its phases every 29.5 days, and its light brightens the night.
+- **Weather:** systems drift east at realistic speeds, bringing rain, snow, fog, thunderstorms, blizzards and
+  sandstorms, plus heatwaves and cold snaps. The landscape changes with the seasons, with autumn leaves and winter snow.
+- **Rivers and lakes:** rain drains downhill to the sea across the real terrain, carving rivers, and fills basins
+  into lakes. Riverside villages can irrigate through a drought, but rivers flood.
+- **Tides:** the moon moves the shoreline twice a day, with the biggest tides at full and new moon. A storm on a
+  spring tide can flood the coast.
+- **Daily life:** people sleep at night, work by day, go to school and the market, shelter from storms and rest
+  through the hottest hours.
+- **Clothing:** people dress for how cold it feels, the rain, the place and the job, from straw hats and desert
+  robes to raincoats and fur parkas. You can see it when you zoom in. Warm clothes cost money, so the poor feel the
+  cold first.
+- **Consequences:** warmth and rain grow crops. Harvests set food stores and prices, which drive farmers' income,
+  health and mood. Flu follows the cold. Severe weather can only bring forward a death already due within three
+  EON months, so the calibrated life expectancy holds.
+
 ## God
 
 There is exactly **one God, forever**: the owner of this world, who appears in-world as **The Creator**.
@@ -129,6 +152,7 @@ From the God console, God can:
 - perform **Genesis**: name the first village and the first two souls (this happens once)
 - add **founders** during the Genesis era, or leave that to God's **autopilot**
 - **balance the world** with fertility, mortality, disease, sex ratio and land capacity
+- **change the climate** with a global temperature shift and a rainfall multiplier
 - **pause or resume time**
 - **heal** an agent (a miracle that also grants a fresh fate) or cause a **sudden death**
 - review the **audit log**: every act of God and autopilot, hash-chained and append-only

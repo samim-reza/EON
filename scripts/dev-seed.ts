@@ -1,15 +1,16 @@
 // LOCAL DEV ONLY: prints SQL that performs Genesis directly (bypassing the God UI) and fast-forwards N EON years.
 // Usage: npx tsx scripts/dev-seed.ts <seed> <years> | docker exec -i supabase_db_EON psql -U postgres -d postgres
-import { computeSites } from "../src/shared/world";
+import { sitesWithWater } from "../src/shared/rivers";
 
 const seed = Number(process.argv[2] ?? 4242);
 const years = Number(process.argv[3] ?? 20);
-const sites = computeSites(seed);
+const sites = sitesWithWater(seed);
 console.log(`\\set ON_ERROR_STOP 1
 set statement_timeout = 0;
 update sim.world set seed = ${seed}, paused = false, genesis_at = now() where id = 1;
-insert into sim.sites (id, x, y, region) select (e->>0)::int, (e->>1)::real, (e->>2)::real, (e->>3)::smallint from jsonb_array_elements('${JSON.stringify(sites)}'::jsonb) e;
+insert into sim.sites (id, x, y, region, elev, river, coast) select (e->>0)::int, (e->>1)::real, (e->>2)::real, (e->>3)::smallint, (e->>4)::real, (e->>5)::real, (e->>6)::boolean from jsonb_array_elements('${JSON.stringify(sites)}'::jsonb) e;
 select sim.rebuild_life_table();
+select sim.refresh_climate();
 select sim.ensure_event_partitions(0);
 select sim.found_settlement(0, ${sites[0][0]}, 'Eden') as st \\gset
 select sim.spawn_agent(0, 'Lyra', 'Voss', 'F', -20*1440, null, null, '{}', 0::smallint, true, :st, null, sim.random_traits(1), 300);
