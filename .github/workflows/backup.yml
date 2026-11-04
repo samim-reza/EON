@@ -26,7 +26,7 @@ jobs:
             --symmetric --cipher-algo AES256 -o eon.dump.gpg eon.dump
           rm eon.dump
           ls -lh eon.dump.gpg
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: hashFiles('eon.dump.gpg') != ''
         with:
           name: eon-backup-${{ github.run_id }}
