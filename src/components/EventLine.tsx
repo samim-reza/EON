@@ -28,7 +28,7 @@ const COLORS: Record<string, string> = {
 const ICONS: Record<string, string> = {
   birth: "✦", death: "✝", union: "♥", wedding: "◈", pregnant: "◌", diagnosis: "⚕", outbreak: "☣",
   genesis: "☀", founders_arrive: "☀", founder_created: "☀", miracle_heal: "✧", founded: "⌂", became_town: "⌂", became_city: "⌂",
-  weather: "☁", harvest: "❧", discovery: "✺", built: "⌂", moved: "→", prayer: "☾", prayer_answered: "✧", spoke: "❝",
+  weather: "☁", harvest: "❧", discovery: "✺", built: "⌂", moved: "→", prayer: "☾", prayer_answered: "✧", spoke: "❝", voice: "✎",
 };
 
 function A({ id, name }: { id: number | null; name: string | null }) {
@@ -100,6 +100,10 @@ export function describe(e: FeedEvent) {
       return <>{weatherStory(d, place)}</>;
     case "discovery":
       return <>{a} {String(d.story)}</>;
+    case "voice":
+      return d.type === "news"
+        ? <><span className="text-god">The news:</span> <span className="text-ink">{String(d.text)}</span></>
+        : <>{a} wrote: <span className="italic text-ink">{String(d.text)}</span></>;
     case "prayer":
       return <>{a} prayed {PRAYERS[String(d.need)] ?? "to The Creator"}</>;
     case "prayer_answered":
@@ -132,6 +136,7 @@ export function EventLine({ e, showDate = true }: { e: FeedEvent; showDate?: boo
       <span className="flex-1 text-ink-2">
         {describe(e)}
         {e.data.first ? <span className="text-god"> · a first for EON</span> : null}
+        {e.data.voice ? <span className="mt-1 block italic text-ink">{String(e.data.voice)}</span> : null}
       </span>
       {showDate && <span className="shrink-0 font-mono text-[11px] text-ink-3">{formatEonDate(e.tick)}</span>}
     </li>

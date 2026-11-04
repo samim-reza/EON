@@ -142,6 +142,12 @@ EON is a real planet, and its climate shapes every life.
   health and mood. Flu follows the cold. Severe weather can only bring forward a death already due within three
   EON months, so the calibrated life expectancy holds.
 
+### Voices
+
+People in EON speak for themselves. The rules decide everything that happens, and an AI writes the words: diaries,
+prayers, obituaries, the stories behind discoveries, and the news. A hard daily budget caps the cost, and if the AI is
+unavailable the world carries on with its plain record of events.
+
 ### Step by step
 
 People start with nothing. A village begins as a gathering place, and everything else has to be discovered, across six
@@ -318,7 +324,8 @@ Copy `.env.example` to `.env.local`. Never commit real values.
 | `SUPABASE_SECRET_KEY` | server-only key used to read public world data |
 | `SIGNUP_EMAIL_CONFIRMATION` | set to `on` to send confirmation emails, which needs custom SMTP in Supabase. Otherwise the sign-up form creates accounts straight away |
 | `CRON_SECRET` | bearer token for `/api/cron/daily` |
-| `ANTHROPIC_API_KEY` | Claude key for shared world text (M3) |
+| `ANTHROPIC_API_KEY` | Claude key for the world's writing |
+| `MINDS_SECRET` | signs the database's request to wake the AI worker |
 | `BYOK_KEK` | 32-byte master key that encrypts player AI keys (M2) |
 
 ## Testing
@@ -351,7 +358,7 @@ close-kin union ever happens, and the population settles near the land's capacit
 - [x] **M0 Foundation:** Supabase, Next.js 16, security headers, CI
 - [x] **M1 Genesis:** world engine (clock, fate, fertility, kinship, disease, Genesis founders), live map, feed, chronicle, profiles, family trees
 - [ ] **M2 Players:** ~~sign-up~~ (done), captcha, bring-your-own AI key (six providers), request a life, decision cards
-- [ ] **M3 Minds:** AI-written posts, diaries, obituaries, daily news
+- [x] **M3 Minds:** AI-written diaries, prayers, obituaries and news, with a hard daily budget
 - [ ] **M4 Towns:** markets, schools, hospitals and doctors, police, thieves, bribery, migration
 - [ ] **M5 Nations:** cities, countries, governance, calamities
 - [ ] **M6 Launch:** Cloudflare front, load tests, security review

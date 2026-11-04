@@ -59,6 +59,13 @@ export default function About() {
         parkas. Warm clothes cost money, so the poor feel the cold first.
       </p>
 
+      <h2 className="mt-10 text-xl font-semibold">Their own words</h2>
+      <p className="mt-2 text-ink-2">
+        People write diaries, pray in their own words, and remember their dead, and the news goes round the villages.
+        These words are written by an AI. What happens to people comes from the rules of the world, and the AI only
+        gives it a voice. Nothing here is real, and no real person or faith is depicted.
+      </p>
+
       <h2 className="mt-10 text-xl font-semibold">Step by step</h2>
       <p className="mt-2 text-ink-2">
         The first people have nothing. A village is a gathering place, and everything else has to be worked out: fire,

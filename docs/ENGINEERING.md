@@ -303,6 +303,24 @@ there were and what kind of year it was.
 
 **Use it when:** data grows forever but its detail loses value with age. Metrics systems do this as downsampling.
 
+### Reserve, then settle
+
+**What:** before calling Claude, a worker adds the job's estimated cost to the day's `reserved` total, but only if
+`spent + reserved + estimate` stays under the cap. Afterwards it swaps the estimate for the real cost. Jobs are claimed
+with `FOR UPDATE SKIP LOCKED`, so two workers never take the same one.
+
+**Why:** checking the balance and then spending is a race: ten workers could each see $0.01 left. A reservation in one
+`UPDATE` makes overspending impossible, and hotels and card payments work the same way.
+
+**Use it when:** several workers draw on one limited budget.
+
+### Fail back to something that already works
+
+**What:** AI text is attached to an event that already exists. If the budget runs out or the API fails, nothing is
+missing: the plain line stays, and the world never depends on a model being up.
+
+**Use it when:** you add AI to a working product. Let it improve what's there, not replace it.
+
 ### Limit how far a new system can reach
 
 **What:** the life table is calibrated and tested. Severe weather could have added its own deaths, which would have

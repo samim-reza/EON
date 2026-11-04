@@ -76,6 +76,7 @@ const worldSchema = z.object({
   disease_mult: z.coerce.number().min(0).max(5),
   temp_shift: z.coerce.number().min(-20).max(20),
   rain_mult: z.coerce.number().min(0).max(4),
+  llm_cap: z.coerce.number().min(0).max(5),
   female_ratio: z.coerce.number().min(0.3).max(0.7),
   capacity_k: z.coerce.number().int().min(50).max(200_000),
   autopilot: z.enum(["on", "off"]),

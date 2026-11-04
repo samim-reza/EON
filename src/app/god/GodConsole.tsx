@@ -10,7 +10,7 @@ export type GodState = {
   world: {
     tick: number; paused: boolean; genesis_at: string | null; seed: string; last_tick_ms: number; genesis_end_tick: number;
     capacity_k: number; fertility_mult: number; mortality_mult: number; disease_mult: number; crime_mult: number;
-    temp_shift: number; rain_mult: number;
+    temp_shift: number; rain_mult: number; llm_cap?: number;
     female_ratio: number; autopilot: boolean;
   };
   population: number;
@@ -24,6 +24,7 @@ export type GodState = {
   souls?: { id: number; tick: number; username: string }[];
   families?: { id: number; due: number; mother: string; place: string | null }[];
   possessed?: { id: number; name: string; until: number }[];
+  ai?: { spent: number; lines: number; cap: number; waiting: number };
   pyramid: { band: number; F: number; M: number }[];
   dbBytes: number;
   audit: { id: number; at: string; actor: string; action: string; target: string | null; tick: number; hash: string }[];
@@ -149,6 +150,11 @@ export function GodConsole({ state }: { state: GodState }) {
         <span className="tag">tick {w.tick}</span>
         <span className="tag">last tick {w.last_tick_ms} ms</span>
         <span className="tag">db {(state.dbBytes / 1024 / 1024).toFixed(1)} MB / 500 MB</span>
+        {state.ai && (
+          <span className="tag">
+            AI today ${Number(state.ai.spent).toFixed(4)} of ${Number(state.ai.cap).toFixed(2)} · {state.ai.lines} lines · {state.ai.waiting} waiting
+          </span>
+        )}
         <span className={`tag ${w.tick < w.genesis_end_tick ? "text-god" : ""}`}>
           {w.tick < w.genesis_end_tick ? `Genesis era until ${formatEonDate(w.genesis_end_tick)}` : "Genesis era over"}
         </span>
@@ -192,6 +198,7 @@ export function GodConsole({ state }: { state: GodState }) {
           <Slider name="disease_mult" label="Disease" value={w.disease_mult} min={0} max={5} step={0.05} hint="outbreaks & spread" />
           <Slider name="temp_shift" label="World temperature" value={w.temp_shift} min={-20} max={20} step={0.5} hint="°C added everywhere: 0 = natural" />
           <Slider name="rain_mult" label="Rainfall" value={w.rain_mult} min={0} max={4} step={0.05} hint="1 = natural, 0 = endless drought" />
+          <Slider name="llm_cap" label="AI budget per day, $" value={w.llm_cap ?? 0.5} min={0} max={5} step={0.05} hint="0 turns the AI off" />
           <Slider name="female_ratio" label="Share of girls at birth" value={w.female_ratio} min={0.3} max={0.7} step={0.01} hint="0.5 = even" />
           <Slider name="capacity_k" label="Land capacity (K)" value={w.capacity_k} min={50} max={200000} step={50} hint="population settles ≈ 1.7 × K" />
           <label className="flex items-center gap-2 text-sm">

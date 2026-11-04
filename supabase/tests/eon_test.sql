@@ -2,7 +2,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = extensions, public;
 
-select plan(89);
+select plan(96);
 
 -- Tests never contain the real God email: point the lock at a throwaway address for this
 -- transaction only (everything below is rolled back).
@@ -312,6 +312,24 @@ select lives_ok($$select api.god_answer_prayer(current_setting('test.prayer')::b
 reset role;
 select is((select count(*)::int from sim.infections i join asked a on a.id = i.agent_id where i.until_tick > (select tick from sim.world)), 0,
           'an answered prayer for healing ends the illness');                                                                                -- 89
+
+------------------------------------------------------------------------------
+-- Voices
+------------------------------------------------------------------------------
+select ok((select count(*) > 0 from llm.jobs where kind = 'discovery'), 'a discovery asks for words');                                      -- 90
+set local role authenticated;
+select throws_ok('select api.minds_claim(1)', '42501', null, 'players cannot touch the AI queue');                                           -- 91
+reset role;
+update sim.world set llm_cap = 0.5;
+select is(jsonb_array_length(api.minds_claim(3)), 3, 'the worker claims jobs');                                                              -- 92
+select ok((select b.reserved > 0 from llm.budget b where b.day = current_date), 'each claim reserves its cost first');                       -- 93
+select set_config('test.job', (select id::text from llm.jobs where status = 'running' and event_id is not null order by id limit 1), true);
+select api.minds_finish(current_setting('test.job')::bigint, 'The fire is warm tonight.', 100, 40);
+select is((select e.data ->> 'voice' from llm.jobs j join sim.events e on e.tick = j.event_tick and e.id = j.event_id where j.id = current_setting('test.job')::bigint),
+          'The fire is warm tonight.', 'the words join the event');                                                                          -- 94
+select ok((select b.spent = 0.00003 and b.lines = 1 from llm.budget b where b.day = current_date), 'the real cost is settled');              -- 95
+update sim.world set llm_cap = 0;
+select is(jsonb_array_length(api.minds_claim(3)), 0, 'nothing is spent past the cap');                                                       -- 96
 
 select * from finish();
 rollback;
