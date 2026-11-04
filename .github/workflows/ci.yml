@@ -1,0 +1,41 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  app:
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://ci.invalid.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci_placeholder_value
+      SUPABASE_SECRET_KEY: sb_secret_ci_placeholder_value_x
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm audit --omit=dev --audit-level=high
+      - run: npx next typegen
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - name: Demography lab (10 worlds × 300 EON years)
+        run: npm run lab -- 10 300
+      - run: npm run build
+
+  database:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - run: supabase start -x imgproxy,edge-runtime,logflare,vector,supavisor,postgres-meta,studio,storage-api,realtime
+      - run: supabase test db

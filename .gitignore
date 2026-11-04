@@ -1,0 +1,80 @@
+# ─────────────────────────────────────────────────────────────
+#  Secrets — NEVER commit. This repository is public.
+# ─────────────────────────────────────────────────────────────
+key.txt
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+.env
+.env.*
+!.env.example
+god-login.txt
+*-login.txt
+*.secret
+secrets/
+supabase/.env
+supabase/.env.*
+
+# Database dumps & backups (may contain personal data)
+*.dump
+*.dump.gpg
+*.sql.gz
+*.backup
+backups/
+
+# ─────────────────────────────────────────────────────────────
+#  Dependencies
+# ─────────────────────────────────────────────────────────────
+node_modules/
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# ─────────────────────────────────────────────────────────────
+#  Build output & caches
+# ─────────────────────────────────────────────────────────────
+.next/
+out/
+build/
+dist/
+*.tsbuildinfo
+next-env.d.ts
+.turbo/
+.eslintcache
+.cache/
+.vercel/
+
+# ─────────────────────────────────────────────────────────────
+#  Tests & tooling output
+# ─────────────────────────────────────────────────────────────
+coverage/
+playwright-report/
+test-results/
+blob-report/
+lab/out/
+
+# Supabase local state
+supabase/.branches/
+supabase/.temp/
+
+# ─────────────────────────────────────────────────────────────
+#  Logs, editors, OS noise
+# ─────────────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+*~
+.DS_Store
+Thumbs.db

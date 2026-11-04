@@ -1,0 +1,133 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #070b14;
+  --bg-2: #0c1322;
+  --panel: #101a2c;
+  --line: #1d2a42;
+  --ink: #e6ecf5;
+  --ink-2: #9aa8bf;
+  --ink-3: #64738c;
+  --life: #4fd1c5;
+  --life-2: #2c8f88;
+  --god: #f5b84b;
+  --death: #e0677a;
+  --birth: #8fd16a;
+  --love: #e58bd5;
+  --sick: #d9a441;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-2: var(--bg-2);
+  --color-panel: var(--panel);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-life: var(--life);
+  --color-life-2: var(--life-2);
+  --color-god: var(--god);
+  --color-death: var(--death);
+  --color-birth: var(--birth);
+  --color-love: var(--love);
+  --color-sick: var(--sick);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: radial-gradient(1200px 600px at 70% -10%, #11203a 0%, transparent 60%), var(--bg);
+  color: var(--ink);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+.panel {
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.1rem 0.55rem;
+  font-size: 0.72rem;
+  color: var(--ink-2);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 10px;
+  padding: 0.55rem 1rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+  transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btn-life {
+  background: var(--life);
+  color: #04201d;
+}
+.btn-life:hover:not(:disabled) {
+  background: #6fe0d5;
+}
+.btn-god {
+  background: var(--god);
+  color: #2a1a00;
+}
+.btn-god:hover:not(:disabled) {
+  background: #ffcb6b;
+}
+.btn-ghost {
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+.btn-ghost:hover:not(:disabled) {
+  border-color: var(--ink-3);
+}
+
+.input {
+  width: 100%;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.55rem 0.75rem;
+  color: var(--ink);
+  font-size: 0.95rem;
+}
+.input:focus {
+  outline: 2px solid color-mix(in srgb, var(--life) 60%, transparent);
+  outline-offset: 1px;
+}
+
+.pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--life);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--life) 70%, transparent);
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--life) 60%, transparent); }
+  70% { box-shadow: 0 0 0 8px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse-dot { animation: none; }
+}
