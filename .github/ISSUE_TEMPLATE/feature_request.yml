@@ -1,0 +1,22 @@
+name: Idea
+description: Suggest something new for EON
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What's the idea?
+      description: Describe it as something a viewer, player or agent would experience.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why would it make EON better?
+    validations:
+      required: true
+  - type: textarea
+    id: how
+    attributes:
+      label: How might it work?
+      description: Optional. Any thoughts on the rules or the numbers behind it.

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { describe } from "@/components/EventLine";
+import { LiveAge } from "@/components/WorldClock";
 import { pub } from "@/lib/pub";
 import { formatAge, formatEonDate } from "@/shared/time";
 import type { AgentDetail, FeedEvent } from "@/shared/types";
@@ -20,7 +21,10 @@ async function getAgent(raw: string): Promise<AgentDetail | null> {
 
 export async function generateMetadata(props: PageProps<"/agents/[id]">): Promise<Metadata> {
   const a = await getAgent((await props.params).id);
-  return { title: a ? `${a.name} ${a.surname}` : "Unknown agent" };
+  if (!a) return { title: "Unknown agent" };
+  const fullName = `${a.name} ${a.surname}`;
+  const description = `${fullName}, ${formatAge(a.age)} old, ${a.alive ? "lives" : "lived"} in ${a.settlement?.name ?? "EON"}: an AI agent with a family, a body and a fate of their own.`;
+  return { title: fullName, description, openGraph: { title: `${fullName} · EON`, description } };
 }
 
 function Bar({ label, value, tone }: { label: string; value: number; tone: string }) {
@@ -42,7 +46,7 @@ function Person({ p, label }: { p: { id: number; name: string; alive?: boolean }
     <div className="flex justify-between gap-3 py-1.5 text-sm">
       <span className="text-ink-3">{label}</span>
       {p ? (
-        <Link href={`/agents/${p.id}`} className={`hover:underline ${p.alive === false ? "text-ink-3" : "text-ink"}`}>
+        <Link href={`/agents/${p.id}`} prefetch={false} className={`hover:underline ${p.alive === false ? "text-ink-3" : "text-ink"}`}>
           {p.name}
           {p.alive === false ? " ✝" : ""}
         </Link>
@@ -73,7 +77,7 @@ export default async function AgentPage(props: PageProps<"/agents/[id]">) {
           <p className="mt-1 text-ink-2">
             {a.alive ? (
               <>
-                {formatAge(a.age)} old · {a.occupation} in {a.settlement?.name ?? "the wilds"}
+                <LiveAge birthTick={a.birthTick} fallback={formatAge(a.age)} /> old · {a.occupation} in {a.settlement?.name ?? "the wilds"}
                 {a.pregnant ? " · expecting a child" : ""}
               </>
             ) : (
@@ -84,7 +88,7 @@ export default async function AgentPage(props: PageProps<"/agents/[id]">) {
             )}
           </p>
         </div>
-        <Link href={`/family/${a.id}`} className="btn btn-ghost">
+        <Link href={`/family/${a.id}`} prefetch={false} className="btn btn-ghost">
           Family tree
         </Link>
       </div>
@@ -115,7 +119,7 @@ export default async function AgentPage(props: PageProps<"/agents/[id]">) {
               <div className="text-xs text-ink-3">Children ({a.children.length})</div>
               <div className="mt-1 flex flex-wrap gap-2">
                 {a.children.map((c) => (
-                  <Link key={c.id} href={`/agents/${c.id}`} className={`tag hover:text-ink ${c.alive ? "" : "opacity-60"}`}>
+                  <Link key={c.id} href={`/agents/${c.id}`} prefetch={false} className={`tag hover:text-ink ${c.alive ? "" : "opacity-60"}`}>
                     {c.name}
                     {c.alive ? "" : " ✝"}
                   </Link>

@@ -1,0 +1,31 @@
+name: Bug report
+description: Something in EON doesn't work as it should
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you see, and what did you expect to see?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Go to /world
+        2. Click on an agent
+        3. ...
+    validations:
+      required: true
+  - type: input
+    id: where
+    attributes:
+      label: Browser and device
+      placeholder: Chrome on Android
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Screenshots, agent ids, console errors. Please don't include passwords or keys.

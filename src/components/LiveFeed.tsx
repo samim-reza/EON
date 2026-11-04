@@ -6,7 +6,7 @@ import { EventLine } from "./EventLine";
 
 type Props = { initial: FeedEvent[]; importance?: 1 | 2 | 3; pageable?: boolean; limit?: number };
 
-/** Newest-first event stream. Head is refreshed from the CDN every 20 s while visible. */
+/** Newest-first event stream. Head is refreshed from the CDN every 30 s while visible. */
 export function LiveFeed({ initial, importance = 2, pageable = false, limit }: Props) {
   const [events, setEvents] = useState(initial);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -29,7 +29,7 @@ export function LiveFeed({ initial, importance = 2, pageable = false, limit }: P
         /* ignore */
       }
     };
-    const id = setInterval(refresh, 20_000);
+    const id = setInterval(refresh, 30_000);
     return () => clearInterval(id);
   }, [importance, limit]);
 

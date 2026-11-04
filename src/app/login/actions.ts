@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { forgetNav, rememberNav } from "@/lib/nav-session";
 import { createUserClient } from "@/lib/supabase/server";
 
 const schema = z.object({
@@ -19,11 +20,13 @@ export async function signIn(_prev: LoginState, form: FormData): Promise<LoginSt
   // Same message for every failure: never reveal whether an email exists.
   if (error) return { error: "Those credentials did not work." };
   const { data } = await supabase.rpc("whoami");
+  if (data?.username) await rememberNav(data.username, Boolean(data.is_god));
   redirect(data?.is_god ? "/god" : "/me");
 }
 
 export async function signOut() {
   const supabase = await createUserClient();
   await supabase.auth.signOut();
+  await forgetNav();
   redirect("/");
 }

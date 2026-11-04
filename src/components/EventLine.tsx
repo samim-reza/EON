@@ -27,7 +27,7 @@ const ICONS: Record<string, string> = {
 function A({ id, name }: { id: number | null; name: string | null }) {
   if (!id || !name) return <span className="text-ink-2">someone</span>;
   return (
-    <Link href={`/agents/${id}`} className="font-medium text-ink hover:text-life hover:underline">
+    <Link href={`/agents/${id}`} prefetch={false} className="font-medium text-ink hover:text-life hover:underline">
       {name}
     </Link>
   );

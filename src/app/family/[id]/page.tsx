@@ -25,6 +25,7 @@ function Card({ p, root }: { p: FamilyPerson; root: boolean }) {
   return (
     <Link
       href={`/agents/${p.id}`}
+      prefetch={false}
       className={`panel block min-w-36 px-3 py-2 text-sm hover:border-ink-3 ${root ? "border-life" : ""} ${p.alive ? "" : "opacity-60"}`}
     >
       <div className={p.sex === "F" ? "text-love" : "text-life"}>{p.sex === "F" ? "♀" : "♂"}</div>

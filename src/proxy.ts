@@ -1,10 +1,12 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { encodeNav, NAV_COOKIE, NAV_COOKIE_MAX_AGE } from "@/shared/nav-cookie";
 
 /**
  * Runs only on interactive ("play") routes: /me, /god, /login, /signup, /auth/*.
  * 1. Builds a per-request nonce Content-Security-Policy (scripts must carry the nonce).
  * 2. Refreshes the Supabase session (httpOnly cookies).
+ * 3. Keeps the display-only nav hint in step with the real session.
  * Authorization is NOT decided here — every server action / RPC re-checks it.
  */
 const isDev = process.env.NODE_ENV === "development";
@@ -45,6 +47,7 @@ export async function proxy(request: NextRequest) {
   const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   if (url && key) {
     const supabase = createServerClient(url, key, {
+      db: { schema: "api" },
       cookieOptions: SESSION,
       cookies: {
         getAll: () => request.cookies.getAll(),
@@ -55,7 +58,19 @@ export async function proxy(request: NextRequest) {
         },
       },
     });
-    await supabase.auth.getClaims(); // refreshes an expiring session
+    const { data: session } = await supabase.auth.getClaims(); // refreshes an expiring session
+    const signedIn = Boolean(session?.claims?.sub);
+    const hinted = request.cookies.has(NAV_COOKIE);
+    if (signedIn && !hinted) {
+      const { data: me } = await supabase.rpc("whoami");
+      if (me?.username) {
+        response.cookies.set(NAV_COOKIE, encodeNav(me.username, Boolean(me.is_god)), {
+          secure: !isDev, sameSite: "lax", path: "/", maxAge: NAV_COOKIE_MAX_AGE,
+        });
+      }
+    } else if (!signedIn && hinted) {
+      response.cookies.delete(NAV_COOKIE);
+    }
   }
   response.headers.set("Content-Security-Policy", csp);
   response.headers.set("Cache-Control", "private, no-store");

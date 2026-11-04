@@ -131,3 +131,16 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .pulse-dot { animation: none; }
 }
+
+/* Keeps the headline readable over the live map, and fades the map into the page below. */
+.hero-scrim {
+  background:
+    linear-gradient(180deg, transparent 150px, color-mix(in srgb, var(--bg) 88%, transparent) 300px);
+}
+@media (min-width: 1024px) {
+  .hero-scrim {
+    background:
+      linear-gradient(0deg, var(--bg) 0%, transparent 22%),
+      linear-gradient(90deg, color-mix(in srgb, var(--bg) 92%, transparent) 0%, color-mix(in srgb, var(--bg) 72%, transparent) 38%, transparent 62%);
+  }
+}

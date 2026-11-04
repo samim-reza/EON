@@ -2,7 +2,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = extensions, public;
 
-select plan(29);
+select plan(37);
 
 -- Tests never contain the real God email: point the lock at a throwaway address for this
 -- transaction only (everything below is rolled back).
@@ -106,6 +106,21 @@ select throws_ok($$
   '23514', null, 'siblings can never form a union');                                                        -- 28
 select is((select count(*)::int from sim.unions u join sim.agents f on f.id = u.female_id join sim.agents m on m.id = u.male_id
            where sim.is_close_kin(f.id, f.lineage, m.id, m.lineage)), 0, 'no close-kin unions exist');     -- 29
+
+-- Sign-up
+select is(api.signup_gate(repeat('a', 64), 'bad name!', 'a@example.com'), 'invalid', 'gate rejects malformed usernames'); -- 30
+select is(api.signup_gate(repeat('a', 64), 'admin', 'a@example.com'), 'reserved', 'gate rejects reserved usernames');     -- 31
+select is(api.signup_gate(repeat('a', 64), 'creator', 'a@example.com'), 'reserved', 'nobody else can be called creator'); -- 32
+select is(api.signup_gate(repeat('a', 64), 'brand_new_soul', 'a@example.com'), 'ok', 'gate accepts a free username');     -- 33
+select is(api.signup_gate(repeat('a', 64), 'sneaky_soul', ' Creator@EON.test '), 'refused', 'the form can never create the God account'); -- 34
+insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_user_meta_data, created_at, updated_at)
+values ('44444444-4444-4444-4444-444444444444', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+        'imposter@eon.test', 'x', now(), '{"username":"admin"}', now(), now());
+select is((select username from app.profiles where user_id = '44444444-4444-4444-4444-444444444444'), 'soul_admin',
+          'a direct Auth API call cannot claim a reserved name');                                          -- 35
+select throws_ok($$select api.signup_gate('not-a-hash', 'someone', 'a@example.com')$$, '22023', null, 'gate needs a hashed client'); -- 36
+select throws_ok($$select api.signup_gate(repeat('b', 64), 'x' || g, 'a@example.com') from generate_series(100, 111) g$$,
+                 'P0429', null, 'gate stops a burst of sign-ups from one client');                          -- 37
 
 select * from finish();
 rollback;

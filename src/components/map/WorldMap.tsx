@@ -2,9 +2,12 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FLAG_FOUNDER, FLAG_PLAYER, FLAG_PREGNANT, FLAG_SICK, type Geo, type NowState, type Roster } from "@/shared/types";
-import { eonDate, formatAge, lifeStage, PHASES } from "@/shared/time";
-import { indexBuildings, makeTerrain, placeFor, WORLD_SIZE, type BuildingIndex } from "@/shared/world";
+import { LiveAge, WorldClock } from "@/components/WorldClock";
+import { currentTick, useWorld } from "@/components/world-time";
+import { FLAG_FOUNDER, FLAG_PLAYER, FLAG_PREGNANT, FLAG_SICK, type Geo, type Roster } from "@/shared/types";
+import { lifeStage } from "@/shared/time";
+import { indexBuildings, placeFor, WORLD_SIZE, type BuildingIndex } from "@/shared/world";
+import { loadTerrain } from "./terrain";
 
 type Agent = {
   id: number; name: string; sex: "F" | "M"; birth: number; settlement: number; home: number | null;
@@ -13,58 +16,12 @@ type Agent = {
 
 type Cam = { x: number; y: number; z: number }; // world-space centre, pixels per world unit
 
-const TERRAIN_RES = 1; // world units per terrain pixel
+/** Everyone in one settlement, with the radius they stay inside: off-screen towns skip all per-agent work. */
+type Group = { x: number; y: number; radius: number; agents: Agent[] };
 
-const RAMP: [number, [number, number, number]][] = [
-  [-0.6, [8, 16, 34]],
-  [-0.2, [12, 30, 58]],
-  [-0.02, [22, 52, 86]],
-  [0.0, [74, 84, 72]],
-  [0.05, [44, 78, 52]],
-  [0.22, [34, 68, 44]],
-  [0.4, [30, 56, 40]],
-  [0.52, [66, 70, 60]],
-  [0.65, [96, 98, 100]],
-  [0.8, [150, 156, 162]],
-];
-
-function terrainColor(e: number): [number, number, number] {
-  if (e <= RAMP[0][0]) return RAMP[0][1];
-  for (let i = 1; i < RAMP.length; i++) {
-    const [e1, c1] = RAMP[i];
-    if (e <= e1) {
-      const [e0, c0] = RAMP[i - 1];
-      const t = (e - e0) / (e1 - e0);
-      return [c0[0] + (c1[0] - c0[0]) * t, c0[1] + (c1[1] - c0[1]) * t, c0[2] + (c1[2] - c0[2]) * t];
-    }
-  }
-  return RAMP[RAMP.length - 1][1];
-}
-
-function renderTerrain(seed: number): HTMLCanvasElement {
-  const t = makeTerrain(seed);
-  const n = WORLD_SIZE / TERRAIN_RES;
-  const c = document.createElement("canvas");
-  c.width = n;
-  c.height = n;
-  const ctx = c.getContext("2d")!;
-  const img = ctx.createImageData(n, n);
-  for (let py = 0; py < n; py++) {
-    for (let px = 0; px < n; px++) {
-      const e = t.elevation(px * TERRAIN_RES, py * TERRAIN_RES);
-      const [r, g, b] = terrainColor(e);
-      // cheap hill-shading from the slope toward the north-west light
-      const shade = e > 0 ? 1 + Math.max(-0.18, Math.min(0.18, (e - t.elevation(px * TERRAIN_RES - 2, py * TERRAIN_RES - 2)) * 6)) : 1;
-      const i = (py * n + px) * 4;
-      img.data[i] = r * shade;
-      img.data[i + 1] = g * shade;
-      img.data[i + 2] = b * shade;
-      img.data[i + 3] = 255;
-    }
-  }
-  ctx.putImageData(img, 0, 0);
-  return c;
-}
+const HERO_HOLD_S = 26; // seconds at each settlement in the landing-page tour
+const HERO_TRAVEL_S = 7; // of which the last few are spent travelling to the next one
+const HERO_TERRAIN_RES = 1.5; // coarser than the full map: it sits behind text, and it loads faster
 
 function unpack(r: Roster): Agent[] {
   return r.id.map((id, i) => ({
@@ -75,73 +32,96 @@ function unpack(r: Roster): Agent[] {
 
 const ease = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 
-export function WorldMap() {
+export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
+  const hero = variant === "hero";
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
-  const [now, setNow] = useState<NowState | null>(null);
-  const nowAt = useRef<number>(0);
+  const { now, failing } = useWorld();
   const [geo, setGeo] = useState<Geo | null>(null);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [selected, setSelected] = useState<Agent | null>(null);
   const [follow, setFollow] = useState(false);
   const [query, setQuery] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [stop, setStop] = useState<{ name: string; pop: number } | null>(null);
   const cam = useRef<Cam>({ x: 500, y: 500, z: 3 });
   const terrain = useRef<HTMLCanvasElement | null>(null);
   const placed = useRef(false);
+  const onScreen = useRef(true);
 
   // --- data -------------------------------------------------------------------
-  const loadedVersion = useRef<number>(-1);
-  const refresh = useCallback(async () => {
-    try {
-      const r = await fetch("/api/pub/now");
-      if (!r.ok) throw new Error();
-      const n: NowState = await r.json();
-      nowAt.current = performance.now();
-      setNow(n);
-      if (n.genesis && n.rosterVersion !== loadedVersion.current) {
-        const w = await fetch(`/api/pub/world/${n.rosterVersion}`);
-        if (!w.ok) throw new Error();
-        const data: { roster: Roster; geo: Geo } = await w.json();
-        loadedVersion.current = data.roster.version;
+  const requestedVersion = useRef<number>(-1);
+  useEffect(() => {
+    if (!now?.genesis || now.rosterVersion === requestedVersion.current) return;
+    const version = now.rosterVersion;
+    requestedVersion.current = version;
+    fetch(`/api/pub/world/${version}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((data: { roster: Roster; geo: Geo }) => {
         setGeo(data.geo);
         setAgents(unpack(data.roster));
-      }
-      setError(null);
-    } catch {
-      setError("Lost contact with EON — retrying…");
-    }
-  }, []);
-
-  useEffect(() => {
-    const first = setTimeout(refresh, 0);
-    const id = setInterval(() => document.visibilityState === "visible" && refresh(), 30_000);
-    return () => {
-      clearTimeout(first);
-      clearInterval(id);
-    };
-  }, [refresh]);
+        setLoadFailed(false);
+      })
+      .catch(() => {
+        requestedVersion.current = -1; // try again on the next poll
+        setLoadFailed(true);
+      });
+  }, [now]);
 
   const idx: BuildingIndex | null = useMemo(() => (geo ? indexBuildings(geo.buildings) : null), [geo]);
   const settlementById = useMemo(() => new Map((geo?.settlements ?? []).map((s) => [s.id, s])), [geo]);
 
+  const groups = useMemo<Group[]>(() => {
+    const members = new Map<number, Agent[]>();
+    for (const a of agents) {
+      const list = members.get(a.settlement);
+      if (list) list.push(a);
+      else members.set(a.settlement, [a]);
+    }
+    const radius = new Map<number, number>();
+    for (const b of idx?.byId.values() ?? []) {
+      const s = settlementById.get(b.settlement);
+      if (s) radius.set(b.settlement, Math.max(radius.get(b.settlement) ?? 0, Math.hypot(b.x - s.x, b.y - s.y)));
+    }
+    return [...members].map(([id, list]) => {
+      const s = settlementById.get(id);
+      return s ? { x: s.x, y: s.y, radius: (radius.get(id) ?? 0) + 8, agents: list } : { x: 500, y: 500, radius: WORLD_SIZE, agents: list };
+    });
+  }, [agents, idx, settlementById]);
+
+  const stops = useMemo(() => [...(geo?.settlements ?? [])].sort((a, b) => b.pop - a.pop).slice(0, 6), [geo]);
+
   useEffect(() => {
     if (!geo) return;
-    terrain.current = renderTerrain(Number(geo.seed));
+    let live = true;
+    void loadTerrain(Number(geo.seed), hero ? HERO_TERRAIN_RES : 1).then((canvas) => {
+      if (!live) return;
+      terrain.current = canvas;
+      setReady(true);
+    });
     if (!placed.current && geo.settlements.length) {
       const s = geo.settlements[0];
       cam.current = { x: s.x, y: s.y, z: 7 };
       placed.current = true;
     }
-  }, [geo]);
+    return () => {
+      live = false;
+    };
+  }, [geo, hero]);
+
+  // The landing page must not spend the battery of someone reading further down.
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    if (!hero || !wrap) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      onScreen.current = entry.isIntersecting;
+    });
+    observer.observe(wrap);
+    return () => observer.disconnect();
+  }, [hero]);
 
   // --- rendering ------------------------------------------------------------------
-  const tickFloat = useCallback(() => {
-    if (!now) return 0;
-    if (now.paused) return now.tick;
-    return now.tick + Math.min(1.5, (performance.now() - nowAt.current) / 60_000);
-  }, [now]);
-
   const positionOf = useCallback(
     (a: Agent, tf: number) => {
       if (!idx) return { x: 0, y: 0 };
@@ -163,31 +143,56 @@ export function WorldMap() {
     const wrap = wrapRef.current;
     if (!canvas || !wrap) return;
     const ctx = canvas.getContext("2d")!;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     let raf = 0;
     let last = 0;
+    let shownStop = "";
     const draw = (ts: number) => {
       raf = requestAnimationFrame(draw);
-      if (ts - last < 33) return; // ~30 fps
+      if (ts - last < (hero ? 50 : 33) || !onScreen.current) return; // 20 fps behind the headline, 30 on the map
       last = ts;
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const dpr = Math.min(hero ? 1.5 : 2, window.devicePixelRatio || 1);
       const W = wrap.clientWidth;
       const H = wrap.clientHeight;
-      if (canvas.width !== W * dpr || canvas.height !== H * dpr) {
-        canvas.width = W * dpr;
-        canvas.height = H * dpr;
+      const cw = Math.round(W * dpr);
+      const ch = Math.round(H * dpr);
+      if (canvas.width !== cw || canvas.height !== ch) {
+        canvas.width = cw;
+        canvas.height = ch;
         canvas.style.width = `${W}px`;
         canvas.style.height = `${H}px`;
       }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const tf = tickFloat();
+      const tf = currentTick() ?? now?.tick ?? 0;
       const c = cam.current;
       if (follow && selected) {
         const p = positionOf(selected, tf);
         c.x += (p.x - c.x) * 0.15;
         c.y += (p.y - c.y) * 0.15;
       }
-      const sx = (x: number) => (x - c.x) * c.z + W / 2;
-      const sy = (y: number) => (y - c.y) * c.z + H / 2;
+      const wide = W >= 1024;
+      if (hero && stops.length) {
+        const secs = reducedMotion ? 0 : ts / 1000;
+        const seg = Math.floor(secs / HERO_HOLD_S);
+        const from = stops[seg % stops.length];
+        const to = stops[(seg + 1) % stops.length];
+        const k = ease(Math.max(0, (secs % HERO_HOLD_S - (HERO_HOLD_S - HERO_TRAVEL_S)) / HERO_TRAVEL_S));
+        const far = Math.min(1, Math.hypot(to.x - from.x, to.y - from.y) / 150);
+        c.x = from.x + (to.x - from.x) * k + Math.cos(secs / 19) * 4;
+        c.y = from.y + (to.y - from.y) * k + Math.sin(secs / 27) * 3;
+        c.z = (wide ? 7 : 5.5) * (1 - 0.6 * far * Math.sin(Math.PI * k)) + Math.sin(secs / 31) * 0.3;
+        const at = k < 0.5 ? from : to;
+        const label = `${at.id}:${at.pop}`;
+        if (label !== shownStop) {
+          shownStop = label;
+          setStop({ name: at.name, pop: at.pop });
+        }
+      }
+      // The hero keeps the village clear of the headline and of the feed.
+      const focusX = W * (hero && wide ? 0.6 : 0.5);
+      const focusY = hero ? (wide ? H * 0.36 : 130) : H * 0.5; // on phones, the strip above the headline
+      const sx = (x: number) => (x - c.x) * c.z + focusX;
+      const sy = (y: number) => (y - c.y) * c.z + focusY;
 
       ctx.fillStyle = "#070b14";
       ctx.fillRect(0, 0, W, H);
@@ -211,26 +216,34 @@ export function WorldMap() {
 
       // agents
       const r = Math.max(1.4, Math.min(5, c.z * 0.6));
-      for (const a of agents) {
-        const p = positionOf(a, tf);
-        const x = sx(p.x);
-        const y = sy(p.y);
-        if (x < -5 || y < -5 || x > W + 5 || y > H + 5) continue;
-        const stage = lifeStage((tf - a.birth) / 1440);
-        ctx.beginPath();
-        ctx.arc(x, y, stage === "baby" ? r * 0.6 : stage === "child" ? r * 0.8 : r, 0, Math.PI * 2);
-        ctx.fillStyle = stage === "elder" ? "#c9d1dc" : a.sex === "F" ? "#e58bd5" : "#4fd1c5";
-        ctx.fill();
-        if (a.flags & (FLAG_SICK | FLAG_PREGNANT | FLAG_PLAYER | FLAG_FOUNDER) && c.z >= 2) {
-          ctx.lineWidth = 1;
-          ctx.strokeStyle = a.flags & FLAG_PLAYER ? "#ffffff" : a.flags & FLAG_SICK ? "#d9a441" : a.flags & FLAG_PREGNANT ? "#ffb3ec" : "#f5b84b";
-          ctx.stroke();
+      const labels: { x: number; y: number; name: string; d: number }[] = [];
+      for (const g of groups) {
+        const gx = sx(g.x);
+        const gy = sy(g.y);
+        const margin = g.radius * c.z + 10;
+        if (gx < -margin || gy < -margin || gx > W + margin || gy > H + margin) continue;
+        for (const a of g.agents) {
+          const p = positionOf(a, tf);
+          const x = sx(p.x);
+          const y = sy(p.y);
+          if (x < -5 || y < -5 || x > W + 5 || y > H + 5) continue;
+          const stage = lifeStage((tf - a.birth) / 1440);
+          ctx.beginPath();
+          ctx.arc(x, y, stage === "baby" ? r * 0.6 : stage === "child" ? r * 0.8 : r, 0, Math.PI * 2);
+          ctx.fillStyle = stage === "elder" ? "#c9d1dc" : a.sex === "F" ? "#e58bd5" : "#4fd1c5";
+          ctx.fill();
+          if (a.flags & (FLAG_SICK | FLAG_PREGNANT | FLAG_PLAYER | FLAG_FOUNDER) && c.z >= 2) {
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = a.flags & FLAG_PLAYER ? "#ffffff" : a.flags & FLAG_SICK ? "#d9a441" : a.flags & FLAG_PREGNANT ? "#ffb3ec" : "#f5b84b";
+            ctx.stroke();
+          }
+          if (hero) labels.push({ x, y, name: a.name, d: (x - focusX) ** 2 + (y - focusY) ** 2 });
         }
       }
 
       // night
       const phase = ((Math.floor(tf) % 4) + 4) % 4;
-      const dark = [0.08, 0, 0.22, 0.42][phase];
+      const dark = [0.08, 0, 0.22, 0.42][phase] * (hero ? 0.6 : 1);
       if (dark) {
         ctx.fillStyle = `rgba(4, 8, 24, ${dark})`;
         ctx.fillRect(0, 0, W, H);
@@ -254,6 +267,19 @@ export function WorldMap() {
         ctx.fillText(`${s.name} · ${s.pop}`, x, y - Math.max(10, c.z * 9));
       }
 
+      // people have names: the hero introduces a few of them
+      if (labels.length) {
+        ctx.font = "500 11px var(--font-geist-sans), system-ui";
+        ctx.fillStyle = "rgba(230, 236, 245, 0.85)";
+        const placed: { x: number; y: number }[] = [];
+        for (const l of labels.sort((a, b) => a.d - b.d)) {
+          if (placed.length === 5) break;
+          if (placed.some((o) => Math.abs(o.x - l.x) < 70 && Math.abs(o.y - l.y) < 15)) continue; // no overlapping names
+          placed.push(l);
+          ctx.fillText(l.name, l.x, l.y - r - 5);
+        }
+      }
+
       // selection ring
       if (selected) {
         const p = positionOf(selected, tf);
@@ -266,7 +292,7 @@ export function WorldMap() {
     };
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
-  }, [agents, geo, idx, positionOf, selected, follow, tickFloat]);
+  }, [agents, geo, groups, hero, idx, now?.tick, positionOf, selected, follow, stops]);
 
   // --- interaction ------------------------------------------------------------------
   const pointers = useRef(new Map<number, { x: number; y: number }>());
@@ -301,7 +327,7 @@ export function WorldMap() {
   const pick = (px: number, py: number) => {
     const wrap = wrapRef.current!;
     const c = cam.current;
-    const tf = tickFloat();
+    const tf = currentTick() ?? now?.tick ?? 0;
     let best: Agent | null = null;
     let bd = 12 * 12;
     for (const a of agents) {
@@ -360,8 +386,21 @@ export function WorldMap() {
     return agents.filter((a) => a.name.toLowerCase().includes(q)).slice(0, 8);
   }, [agents, query]);
 
-  const d = now ? eonDate(now.tick) : null;
-  const tfNow = now?.tick ?? 0;
+  const error = loadFailed || failing ? "Lost contact with EON. Retrying…" : null;
+
+  if (hero) {
+    return (
+      <div ref={wrapRef} aria-hidden className={`absolute inset-0 transition-opacity duration-1000 ${ready ? "opacity-100" : "opacity-0"}`}>
+        <canvas ref={canvasRef} className="absolute inset-0" />
+        <div className="hero-scrim absolute inset-0" />
+        {stop && (
+          <div className="tag absolute left-4 top-4 bg-bg/70">
+            <span className="pulse-dot" /> Live · {stop.name} · {stop.pop === 1 ? "1 soul" : `${stop.pop} souls`}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="relative h-[calc(100dvh-90px)] w-full overflow-hidden sm:h-[calc(100dvh-57px)]" ref={wrapRef}>
@@ -376,25 +415,23 @@ export function WorldMap() {
         role="img"
       />
 
+      <div className="absolute right-3 top-3">
+        <WorldClock />
+      </div>
+
       <div className="pointer-events-none absolute left-3 top-3 flex flex-col gap-2">
         <div className="panel pointer-events-auto px-3 py-2 text-sm">
-          {now?.genesis && d ? (
-            <>
-              <div className="font-mono">
-                Year {d.year} · {d.monthName} {d.day}
-              </div>
-              <div className="text-xs text-ink-3">
-                {PHASES[d.phase]} · {agents.length} alive · {geo?.settlements.length ?? 0} settlements
-                {now.paused ? " · paused" : ""}
-              </div>
-            </>
+          {now?.genesis ? (
+            <span className="text-ink-2">
+              {agents.length} alive · {geo?.settlements.length ?? 0} {geo?.settlements.length === 1 ? "settlement" : "settlements"}
+            </span>
           ) : now ? (
-            <span className="text-ink-3">The void — EON awaits its Creator.</span>
+            <span className="text-ink-3">The void: EON awaits its Creator.</span>
           ) : (
             <span className="text-ink-3">Connecting to EON…</span>
           )}
         </div>
-        <div className="pointer-events-auto w-64">
+        <div className="pointer-events-auto w-44 sm:w-64">
           <input
             className="input"
             placeholder="Find an agent…"
@@ -440,7 +477,7 @@ export function WorldMap() {
             <div>
               <div className="font-semibold">{selected.name}</div>
               <div className="text-ink-2">
-                {formatAge((tfNow - selected.birth) / 1440)} · {selected.job} · {settlementById.get(selected.settlement)?.name}
+                <LiveAge birthTick={selected.birth} /> · {selected.job} · {settlementById.get(selected.settlement)?.name}
               </div>
             </div>
             <button onClick={() => { setSelected(null); setFollow(false); }} className="text-ink-3 hover:text-ink" aria-label="Close">
@@ -465,4 +502,8 @@ export function WorldMap() {
       )}
     </div>
   );
+}
+
+export function HeroWorld() {
+  return <WorldMap variant="hero" />;
 }

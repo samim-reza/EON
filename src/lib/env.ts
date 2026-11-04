@@ -5,6 +5,7 @@ const schema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.url(),
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().min(20),
   SUPABASE_SECRET_KEY: z.string().min(20),
+  SIGNUP_EMAIL_CONFIRMATION: z.string().optional(),
 });
 
 let cached: z.infer<typeof schema> | null = null;
@@ -16,6 +17,7 @@ export function env() {
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
     SUPABASE_SECRET_KEY: process.env.SUPABASE_SECRET_KEY,
+    SIGNUP_EMAIL_CONFIRMATION: process.env.SIGNUP_EMAIL_CONFIRMATION,
   });
   if (!parsed.success) {
     throw new Error(`Invalid server environment: ${parsed.error.issues.map((i) => i.path.join(".")).join(", ")}`);
