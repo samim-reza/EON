@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { keepInputs } from "@/components/keep-inputs";
 import { signUp, type SignupState } from "./actions";
 
 export function SignupForm() {
@@ -15,7 +16,7 @@ export function SignupForm() {
     );
   }
   return (
-    <form action={action} className="space-y-4">
+    <form action={action} onSubmit={keepInputs(action)} className="space-y-4">
       <label className="block text-sm">
         <span className="text-ink-2">Username</span>
         <input

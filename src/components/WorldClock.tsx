@@ -7,6 +7,7 @@ import { currentTick, useWorld } from "./world-time";
 
 /** Re-reads world time once a second. An EON minute lasts 1/6 of a real second, so the clock visibly runs. */
 function useTick(): number | null {
+  useWorld(); // Subscribing is what starts the shared poller; a page may have no other live widget.
   const [tick, setTick] = useState<number | null>(null);
   useEffect(() => {
     const update = () => setTick(currentTick());
