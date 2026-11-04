@@ -12,7 +12,7 @@ within a few days. We'll tell you when it's fixed and credit you unless you'd ra
 
 ## What we care about most
 
-- Anyone other than the one God gaining God powers, or skipping the MFA requirement
+- Anyone gaining privileged access, or skipping a second-factor requirement
 - Reading or changing data without permission, or bypassing row-level security
 - Stealing sessions, or script injection
 - Forging or altering the audit log

@@ -75,7 +75,7 @@ browser and database can also independently agree without talking to each other.
 their arrays overlap, which is a single array comparison rather than a recursive family-tree query.
 
 **Where:** `sim.is_close_kin` and the `kin_guard` trigger. Because the rule is a trigger, not application code,
-even God can't bypass it.
+nothing can bypass it.
 
 **Use it when:** an expensive question is asked constantly and its inputs rarely change.
 
@@ -257,6 +257,17 @@ one tile per frame. The tide is written into the tile's own pixels, so each fram
 
 **Use it when:** most of a big structure can't be affected by a change. Precompute which part can.
 
+### A minimum spanning tree for paths nobody planned
+
+**What:** people wear paths between places, and the shortest network that joins every building is a minimum spanning
+tree, built with Prim's algorithm in `src/shared/roads.ts`. Because a tree has exactly one route between any two nodes,
+finding someone's way needs no search: climb from both ends until the two meet.
+
+**Why:** it costs no storage and no pathfinding, and everyone derives the same roads. It looks right too, because paths
+really do branch from a centre.
+
+**Use it when:** you need to connect points cheaply and don't need more than one route between them.
+
 ### Paint small, let the GPU stretch
 
 **What:** light and clouds are computed for a 104 × 70 image a few times a second, then stretched over the map each
@@ -344,9 +355,9 @@ call per page view.
 | Pattern | Where | Idea |
 |---|---|---|
 | **Default deny** | every table | Row-level security is forced on with no policies. Access exists only through explicit functions, and a trigger applies this to any new table |
-| **Enforce rules in the database** | `app.god`, `kin_guard` | A rule in a trigger holds even if the app has a bug |
+| **Enforce rules in the database** | `kin_guard` | A rule in a trigger holds even if the app has a bug |
 | **Hash chain** | `app.god_actions` | Each log entry includes the hash of the one before, so tampering with history is detectable |
-| **Hash what you don't need to read** | God email, IP rate limits | Compare hashes, and the original never has to be stored |
+| **Hash what you don't need to read** | IP rate limits | Compare hashes, and the original never has to be stored |
 | **Nonce CSP** | `src/proxy.ts` | Scripts need a per-request random value, so injected scripts don't run |
 | **Constant-time comparison** | `/api/cron/daily` | Stops attackers learning a secret by timing how long a comparison takes |
 | **Honeypot field** | sign-up form | Hidden from people, irresistible to bots |

@@ -8,7 +8,9 @@ import { LiveActivity, LiveAge, WorldClock } from "@/components/WorldClock";
 import { climateOf } from "@/components/local-climate";
 import { currentTick, setFocus, setResidents, useWorld, type Resident } from "@/components/world-time";
 import { localHour, NO_TUNING, seasonCurve, smooth, tideAt, weatherAt, yearFraction, type Weather } from "@/shared/climate";
-import { outfitFor, planFor, slotInfo, SLOTS_PER_TICK, spotFor, type Outfit, type Plan } from "@/shared/daily-life";
+import { buildingFor, outfitFor, planFor, slotInfo, SLOTS_PER_TICK, spotFor, type Outfit, type Plan } from "@/shared/daily-life";
+import { PLACE_NAMES, roadTier } from "@/shared/progress";
+import { alongPath, buildRoads, linkSettlements, routeBetween } from "@/shared/roads";
 import { TILE_UNITS } from "@/shared/terrain-pixels";
 import { FLAG_FOUNDER, FLAG_PLAYER, FLAG_PREGNANT, FLAG_SICK, type Geo, type Roster } from "@/shared/types";
 import { lifeStage } from "@/shared/time";
@@ -106,7 +108,35 @@ function drawFigure(ctx: CanvasRenderingContext2D, x: number, y: number, r: numb
   }
 }
 
-const ROOFS: Record<string, string> = { home: "#a8694e", temple: "#c9a44e", clinic: "#8fc4bd", farm: "#b08a4a", market: "#b5604a", school: "#8d7fb0" };
+const ROOFS: Record<string, string> = {
+  home: "#a8694e", temple: "#c9a44e", clinic: "#8fc4bd", farm: "#b08a4a", market: "#b5604a", school: "#8d7fb0",
+  hall: "#74839b", smithy: "#5f5a58", mill: "#a79a84", library: "#7c6a94", factory: "#6a6f78", station: "#5b7a8a",
+};
+
+/** The colour of a field through the farming year, starting at the first month of spring. */
+const CROPS = ["#7fa356", "#6f9c4a", "#5f9140", "#7f9c42", "#b4a54a", "#c9a948", "#c2a150", "#a98b55", "#8a7450", "#7d6a4f", "#75654e", "#7a6a50"];
+
+/** Ploughed rows around a farm: the field that people walk out to. */
+function drawField(ctx: CanvasRenderingContext2D, x: number, y: number, z: number, id: number, month: number) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(hash01(id, 31) * Math.PI);
+  const width = 9 * z;
+  const height = 6 * z;
+  ctx.fillStyle = CROPS[month];
+  ctx.fillRect(-width / 2, -height / 2, width, height);
+  ctx.fillStyle = "rgba(60, 44, 26, 0.3)";
+  const rows = Math.max(3, Math.min(9, Math.round(z)));
+  for (let i = 0; i < rows; i++) ctx.fillRect(-width / 2, -height / 2 + ((i + 0.3) * height) / rows, width, (height / rows) * 0.34);
+  ctx.restore();
+}
+
+const ROAD_LOOK: Record<number, { colour: string; width: number }> = {
+  1: { colour: "rgba(206, 186, 140, 0.62)", width: 0.16 }, // a trodden footpath
+  2: { colour: "rgba(150, 118, 80, 0.92)", width: 0.3 }, // a dirt road
+  3: { colour: "rgba(128, 130, 136, 0.96)", width: 0.36 }, // paved
+  4: { colour: "rgba(128, 130, 136, 0.96)", width: 0.4 },
+};
 
 export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
   const hero = variant === "hero";
@@ -125,6 +155,7 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
   const terrain = useRef<TerrainMap | null>(null);
   const atmosphere = useRef<{ seed: number; value: Atmosphere } | null>(null);
   const tune = useRef(NO_TUNING);
+  const tier = useRef(1);
   const glow = useRef<HTMLCanvasElement | null>(null);
   const placed = useRef(false);
   const onScreen = useRef(true);
@@ -182,6 +213,22 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
     setResidents(byPlace);
   }, [agents]);
 
+  const roads = useMemo(() => {
+    if (!idx) return null;
+    const places = [...idx.byId].map(([id, b]) => ({ id, x: b.x, y: b.y, group: b.settlement }));
+    return buildRoads(places, new Map([...settlementById].map(([id, s]) => [id, { x: s.x, y: s.y }])));
+  }, [idx, settlementById]);
+  const links = useMemo(() => (geo ? linkSettlements(geo.settlements, makeTerrain(Number(geo.seed)).elevation) : []), [geo]);
+  const routes = useRef(new Map<string, { x: number; y: number }[]>());
+  useEffect(() => routes.current.clear(), [roads]);
+
+  /** Whose house is whose, for the map's labels. */
+  const homeNames = useMemo(() => {
+    const names = new Map<number, string>();
+    for (const a of agents) if (a.home != null && !names.has(a.home)) names.set(a.home, `${a.name.split(" ").pop()} home`);
+    return names;
+  }, [agents]);
+
   const stops = useMemo(() => [...(geo?.settlements ?? [])].sort((a, b) => b.pop - a.pop).slice(0, 6), [geo]);
 
   useEffect(() => {
@@ -206,7 +253,8 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
 
   useEffect(() => {
     tune.current = now?.tune ?? NO_TUNING;
-  }, [now?.tune]);
+    tier.current = roadTier(now?.known);
+  }, [now?.tune, now?.known]);
 
   // The landing page must not spend the battery of someone reading further down.
   useEffect(() => {
@@ -244,12 +292,13 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
       if (!idx) return { x: 0, y: 0, plan: null, moving: false, weather: null };
       const s = settlementById.get(a.settlement);
       const home = s ? { x: s.x, y: s.y } : { x: 500, y: 500 };
-      const person = { id: a.id, job: a.job, ageYears: (tf - a.birth) / 1440 };
+      const person = { id: a.id, job: a.job, ageYears: (tf - a.birth) / 1440, home: a.home };
+      const has = (kind: string) => idx.civic.has(`${a.settlement}:${kind}`);
       const position = tf * SLOTS_PER_TICK;
       const slot = Math.floor(position);
       const planAt = (n: number) => {
         const info = slotInfo(n, home.x);
-        return planFor(person, info.hour, info.day, info.month, weatherFor(a.settlement, home.x, home.y, n));
+        return planFor(person, info.hour, info.day, info.month, weatherFor(a.settlement, home.x, home.y, n), has);
       };
       const plan = planAt(slot);
       const before = planAt(slot - 1);
@@ -257,10 +306,19 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
       const to = spotFor(a, plan, idx, home);
       if (before.place === plan.place) return { ...to, plan, moving: false, weather };
       const from = spotFor(a, before, idx, home);
-      const k = ease(position - slot);
-      return { x: from.x + (to.x - from.x) * k, y: from.y + (to.y - from.y) * k, plan, moving: true, weather };
+      const start = buildingFor(a, before, idx);
+      const end = buildingFor(a, plan, idx);
+      let route: { x: number; y: number }[] = [];
+      if (roads && start != null && end != null && start !== end) {
+        const key = `${start}:${end}`;
+        route = routes.current.get(key) ?? routeBetween(roads, start, end);
+        routes.current.set(key, route);
+      }
+      // People keep to the path, rather than cutting straight across the land.
+      const p = alongPath([from, ...route, to], ease(position - slot));
+      return { x: p.x, y: p.y, plan, moving: true, weather };
     },
-    [idx, settlementById, weatherFor],
+    [idx, roads, settlementById, weatherFor],
   );
 
   useEffect(() => {
@@ -360,8 +418,43 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
         ctx.globalAlpha = 1;
       }
 
-      // buildings
+      // paths, fields and buildings
+      if (roads && c.z >= 1.5) {
+        const look = ROAD_LOOK[tier.current];
+        ctx.lineCap = "round";
+        ctx.strokeStyle = look.colour;
+        ctx.lineWidth = Math.max(0.8, Math.min(7, c.z * look.width));
+        ctx.beginPath();
+        for (const [ax, ay, bendX, bendY, bx, by] of roads.segments) {
+          if (Math.max(ax, bx) < view.x0 || Math.min(ax, bx) > view.x1 || Math.max(ay, by) < view.y0 || Math.min(ay, by) > view.y1) continue;
+          ctx.moveTo(sx(ax), sy(ay));
+          ctx.quadraticCurveTo(sx(bendX), sy(bendY), sx(bx), sy(by));
+        }
+        if (tier.current >= 2) {
+          for (const [ax, ay, bx, by] of links) {
+            ctx.moveTo(sx(ax), sy(ay));
+            ctx.lineTo(sx(bx), sy(by));
+          }
+        }
+        ctx.stroke();
+        if (tier.current === 4) {
+          ctx.strokeStyle = "rgba(40, 42, 48, 0.8)";
+          ctx.lineWidth = Math.max(0.6, Math.min(2, c.z * 0.08));
+          ctx.setLineDash([c.z * 0.5, c.z * 0.4]);
+          ctx.beginPath();
+          for (const [ax, ay, bx, by] of links) {
+            ctx.moveTo(sx(ax), sy(ay));
+            ctx.lineTo(sx(bx), sy(by));
+          }
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+      }
       if (idx && c.z >= 2.5) {
+        const month = ((Math.floor(tf / 120) % 12) + 12) % 12;
+        for (const [id, b] of idx.byId) {
+          if (b.kind === "farm") drawField(ctx, sx(b.x), sy(b.y), c.z, id, month);
+        }
         for (const [, b] of idx.byId) {
           const x = sx(b.x);
           const y = sy(b.y);
@@ -469,6 +562,26 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
         taken.push({ x, y: y - Math.max(10, c.z * 9) });
       }
 
+      // places have names too, once you are close enough to read them
+      if (idx && c.z >= 4.5) {
+        ctx.font = "500 10px var(--font-geist-sans), system-ui";
+        ctx.lineJoin = "round";
+        for (const [id, b] of idx.byId) {
+          const name = b.kind === "home" ? (c.z >= 9 ? homeNames.get(id) : null) : PLACE_NAMES[b.kind];
+          if (!name) continue;
+          const x = sx(b.x);
+          const y = sy(b.y) + Math.max(13, c.z * 1.5);
+          if (x < -40 || y < -10 || x > W + 40 || y > H + 10) continue;
+          if (taken.some((o) => Math.abs(o.x - x) < 62 && Math.abs(o.y - y) < 13)) continue;
+          taken.push({ x, y });
+          ctx.strokeStyle = "rgba(8, 14, 26, 0.62)";
+          ctx.lineWidth = 3;
+          ctx.strokeText(name, x, y);
+          ctx.fillStyle = "rgba(240, 236, 224, 0.92)";
+          ctx.fillText(name, x, y);
+        }
+      }
+
       // people have names: the hero introduces a few of them
       if (labels.length) {
         ctx.font = "500 11px var(--font-geist-sans), system-ui";
@@ -495,7 +608,7 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
     };
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
-  }, [agents, geo, groups, hero, idx, now?.tick, positionOf, seed, selected, settlementById, follow, stops]);
+  }, [agents, geo, groups, hero, homeNames, idx, links, now?.tick, positionOf, roads, seed, selected, settlementById, follow, stops]);
 
   // --- interaction ------------------------------------------------------------------
   const pointers = useRef(new Map<number, { x: number; y: number }>());

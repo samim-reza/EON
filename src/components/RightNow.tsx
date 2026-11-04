@@ -2,6 +2,7 @@
 
 import { ticksToFullMoon } from "@/shared/climate";
 import { planFor, slotInfo, SLOTS_PER_TICK } from "@/shared/daily-life";
+import { ageName, knownBuildings } from "@/shared/progress";
 import { realDuration, ticksToHarvest } from "@/shared/time";
 import type { NowState } from "@/shared/types";
 import { weatherHere } from "./local-climate";
@@ -23,7 +24,8 @@ export function RightNow({ initial = null, heading = true }: { initial?: NowStat
   const { weather } = weatherHere(now, place.x, place.y, tick);
   const people = place.id === undefined ? [] : residents.get(place.id) ?? [];
   const info = slotInfo(Math.floor(tick * SLOTS_PER_TICK), place.x);
-  const doing = people.map((p) => ({ p, doing: planFor({ id: p.id, job: p.job, ageYears: (tick - p.birth) / 1440 }, info.hour, info.day, info.month, weather).doing }));
+  const has = knownBuildings(now.known);
+  const doing = people.map((p) => ({ p, doing: planFor({ id: p.id, job: p.job, ageYears: (tick - p.birth) / 1440, home: p.home }, info.hour, info.day, info.month, weather, has).doing }));
   const tally = new Map<string, number>();
   for (const d of doing) tally.set(d.doing, (tally.get(d.doing) ?? 0) + 1);
 
@@ -37,6 +39,7 @@ export function RightNow({ initial = null, heading = true }: { initial?: NowStat
 
   return (
     <div className="text-sm">
+      {now.age !== undefined && <p className="mb-1 text-xs text-god">{ageName(now.age)}</p>}
       {heading && <h2 className="text-xs uppercase tracking-widest text-ink-3">Right now in {place.name}</h2>}
       <p className="mt-1 text-ink">
         {weatherLine(sky)}, {Math.round(weather.temp)}°C

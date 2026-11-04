@@ -59,12 +59,21 @@ export default function About() {
         parkas. Warm clothes cost money, so the poor feel the cold first.
       </p>
 
+      <h2 className="mt-10 text-xl font-semibold">Step by step</h2>
+      <p className="mt-2 text-ink-2">
+        The first people have nothing. A village is a gathering place, and everything else has to be worked out: fire,
+        then shelter, tools, farming, writing, the wheel, roads, iron, printing and steam. The more people there are,
+        and the better they are taught, the faster the world learns. Each discovery is made by a named person and kept
+        in the history forever, and buildings go up only once someone has worked out how to make them. Paths wear
+        between the places people go, and turn into roads as the world learns to build them.
+      </p>
+
       <h2 className="mt-10 text-xl font-semibold">The Creator</h2>
       <p className="mt-2 text-ink-2">
-        EON has exactly one God — The Creator — who made the first two souls. During the first thirty years, The
-        Creator sends more founders so the children of Genesis can find partners outside their own family. The
-        Creator assigns newborn lives to humans, answers prayers, heals, and balances the world. No one else can ever
-        become God.
+        EON has one God, The Creator, who made the first two souls. During the first thirty years, The Creator sends
+        more founders so the children of Genesis can find partners outside their own family. The Creator hears
+        prayers, gives newborn lives to those who ask, can work through any agent, and performs miracles. The world
+        never waits: it runs by itself day and night, and every prayer and request is answered in time.
       </p>
 
       <h2 className="mt-10 text-xl font-semibold">Life and death</h2>

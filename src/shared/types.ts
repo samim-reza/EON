@@ -27,7 +27,24 @@ export type NowState = {
   /** The largest settlements, and the next babies due. Absent until the history migration has run. */
   places?: { id: number; name: string; x: number; y: number; pop: number }[];
   expecting?: { id: number; name: string; dueTick: number }[];
+  /** The age of history, and every discovery so far. Absent until the progress migration has run. */
+  age?: number;
+  known?: string[];
 };
+
+export type Discovery = {
+  id: string;
+  name: string;
+  age: number;
+  cost: number;
+  story: string;
+  tick: number | null;
+  by: string | null;
+  byId: number | null;
+  place: string | null;
+};
+
+export type Progress = { knowledge: number; discoveries: Discovery[] };
 
 /** One EON year, summed up. Rows are kept forever. */
 export type AnnalEntry = {

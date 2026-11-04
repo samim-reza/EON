@@ -106,7 +106,7 @@ function subscribeFocus(listener: () => void) {
 
 export const useFocus = () => useSyncExternalStore(subscribeFocus, () => focus, () => null);
 
-export type Resident = { id: number; name: string; job: string; birth: number };
+export type Resident = { id: number; name: string; job: string; birth: number; home: number | null };
 
 let residents: ReadonlyMap<number, Resident[]> = new Map();
 const residentListeners = new Set<() => void>();

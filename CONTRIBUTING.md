@@ -36,20 +36,9 @@ npm run dev
 
 Open <http://localhost:3000>. Local sign-up emails appear in Mailpit at <http://127.0.0.1:54324>.
 
-### Be God locally
+### Grow a local world
 
-The real God account is locked to one email hash, so a fresh local database has no God. To work on the
-God console, re-point the lock at a throwaway local address:
-
-```bash
-docker exec -i supabase_db_EON psql -U postgres -d postgres < scripts/dev-god.sql
-GOD_EMAIL=god@eon.local node --env-file=.env.development.local scripts/create-god.mjs god-login.txt
-```
-
-Sign in at `/god` with the password from `god-login.txt` (git-ignored), set up an authenticator app, and
-press **Let there be EON**.
-
-To skip ahead, grow a local world with history. A 25-year world takes several minutes to build:
+A fresh local database has no world yet. This one builds 25 years of history, which takes several minutes:
 
 ```bash
 npx tsx scripts/dev-seed.ts 4242 25 | docker exec -i supabase_db_EON psql -U postgres -d postgres
@@ -63,6 +52,8 @@ npx tsx scripts/dev-seed.ts 4242 25 | docker exec -i supabase_db_EON psql -U pos
 | Climate, weather, sun and moon | `src/shared/climate.ts` and its SQL twin `sim.weather_at`. Change both, then run `npx tsx scripts/climate-golden.ts` and update the block it prints in `supabase/tests/eon_test.sql` |
 | The daily routine and clothing | `src/shared/daily-life.ts` |
 | Rivers and lakes | `src/shared/rivers.ts` |
+| Discoveries and the ages of history | The `sim.discoveries` table, and `src/shared/progress.ts` |
+| Paths and roads | `src/shared/roads.ts` |
 | What the public API returns | `api.pub_*` in the migrations, and `src/app/api/pub/` |
 | The map | `src/components/map/` and `src/shared/world.ts` |
 | Pages | `src/app/` |
@@ -78,7 +69,7 @@ npx tsx scripts/dev-seed.ts 4242 25 | docker exec -i supabase_db_EON psql -U pos
 - Only the `api` schema is exposed, and it holds functions only. `SECURITY DEFINER` functions must set
   `search_path = ''`.
 - Public data goes through `api.pub_*`, granted to `service_role` only. Browsers never call them directly.
-- Anything only God may do must call `app.assert_god()`, and must write to the audit log through `app.audit()`.
+- Privileged functions must call `app.assert_god()`, and must write to the audit log through `app.audit()`.
 - API routes must reject unknown query parameters, so nobody can bust the CDN cache.
 - Never commit secrets, real email addresses or database dumps.
 
@@ -96,6 +87,14 @@ npx tsx scripts/dev-seed.ts 4242 25 | docker exec -i supabase_db_EON psql -U pos
   browser where you can.
 - Use `prefetch={false}` on `<Link>`s, especially in lists.
 - Live data should go through the shared store in `src/components/world-time.ts`, not through a new poller.
+
+## How to send a change
+
+Every change reaches `main` through a pull request, because nobody can push to `main` directly except the maintainer.
+
+1. Fork the repository and create a branch for your change.
+2. Open a pull request against `main`.
+3. CI must pass and a maintainer must approve it. Any new commit needs a fresh approval, and every review comment must be resolved.
 
 ## Before you open a pull request
 

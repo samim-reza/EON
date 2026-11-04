@@ -121,6 +121,60 @@ export async function createFounder(_prev: ActionResult, form: FormData): Promis
   return godRpc("god_create_founder", { p_name: f.name, p_surname: f.surname, p_sex: f.sex, p_age: f.age, p_settlement: f.settlement });
 }
 
+const settlementSchema = z.object({
+  site: z.coerce.number().int().min(1),
+  name: z.string().trim().min(2, "A name needs at least 2 letters").max(24).regex(/^[\p{L}][\p{L} '-]*$/u, "Use letters only"),
+});
+
+export async function foundSettlement(_prev: ActionResult, form: FormData): Promise<ActionResult> {
+  const parsed = settlementSchema.safeParse(Object.fromEntries(form));
+  if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Invalid settlement");
+  return godRpc("god_found_settlement", { p_site: parsed.data.site, p_name: parsed.data.name });
+}
+
+const moveSchema = z.object({ agent: z.coerce.number().int().min(1), settlement: z.coerce.number().int().min(1) });
+
+export async function moveAgent(_prev: ActionResult, form: FormData): Promise<ActionResult> {
+  const parsed = moveSchema.safeParse(Object.fromEntries(form));
+  if (!parsed.success) return fail("Choose a person and a settlement");
+  return godRpc("god_move_agent", { p_agent: parsed.data.agent, p_settlement: parsed.data.settlement });
+}
+
+const prayerSchema = z.object({ prayer: z.coerce.number().int().min(1), answer: z.enum(["grant", "deny"]) });
+
+export async function answerPrayer(_prev: ActionResult, form: FormData): Promise<ActionResult> {
+  const parsed = prayerSchema.safeParse(Object.fromEntries(form));
+  if (!parsed.success) return fail("Invalid prayer");
+  return godRpc("god_answer_prayer", { p_prayer: parsed.data.prayer, p_grant: parsed.data.answer === "grant" });
+}
+
+const soulSchema = z.object({ soul: z.coerce.number().int().min(1), family: z.coerce.number().int().min(1) });
+
+export async function assignSoul(_prev: ActionResult, form: FormData): Promise<ActionResult> {
+  const parsed = soulSchema.safeParse(Object.fromEntries(form));
+  if (!parsed.success) return fail("Choose a soul and a family");
+  return godRpc("god_assign_soul", { p_soul: parsed.data.soul, p_pregnancy: parsed.data.family });
+}
+
+const possessSchema = z.object({
+  agent: z.coerce.number().int().min(1),
+  job: z.enum(["", "farmer", "builder", "healer"]).optional(),
+  say: z.string().trim().max(200, "Keep it under 200 characters").optional(),
+});
+
+export async function possess(_prev: ActionResult, form: FormData): Promise<ActionResult> {
+  const parsed = possessSchema.safeParse(Object.fromEntries(form));
+  if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Invalid command");
+  const { agent, job, say } = parsed.data;
+  return godRpc("god_possess", { p_agent: agent, p_job: job || null, p_say: say || null });
+}
+
+export async function release(_prev: ActionResult, form: FormData): Promise<ActionResult> {
+  const agent = z.coerce.number().int().min(1).safeParse(form.get("agent"));
+  if (!agent.success) return fail("Invalid agent");
+  return godRpc("god_release", { p_agent: agent.data });
+}
+
 // ---------------------------------------------------------------- Account
 
 const passwordSchema = z.object({

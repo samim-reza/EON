@@ -1,7 +1,8 @@
 "use client";
 
 import { BIOME_NAMES, localHour, moonAt, sunElevation, sunTimes, tideLabel, WEATHER_LABELS, type WeatherKind } from "@/shared/climate";
-import { outfitFor, planFor, slotInfo, SLOTS_PER_TICK } from "@/shared/daily-life";
+import { destination, outfitFor, planFor, slotInfo, SLOTS_PER_TICK } from "@/shared/daily-life";
+import { knownBuildings } from "@/shared/progress";
 import { eonClock, formatAgeExact, formatEonDate, realDuration } from "@/shared/time";
 import type { NowState } from "@/shared/types";
 import { coastalAt, weatherHere } from "./local-climate";
@@ -84,17 +85,21 @@ export function WorldClock({ initial = null }: { initial?: NowState | null }) {
 }
 
 /** Weather and the day's routine for one person, right now. */
-export function LiveActivity({ person, place, showWeather = false }: { person: { id: number; job: string; birth: number }; place: Focus; showWeather?: boolean }) {
+export function LiveActivity({ person, place, showWeather = false }: { person: { id: number; job: string; birth: number; home?: number | null }; place: Focus; showWeather?: boolean }) {
   const { now } = useWorld();
   const tick = useTick();
   if (!now || tick === null) return null;
   const { climate, weather } = weatherHere(now, place.x, place.y, tick);
-  const info = slotInfo(Math.floor(tick * SLOTS_PER_TICK), place.x);
-  const who = { id: person.id, job: person.job, ageYears: (tick - person.birth) / 1440 };
-  const plan = planFor(who, info.hour, info.day, info.month, weather);
+  const slot = Math.floor(tick * SLOTS_PER_TICK);
+  const info = slotInfo(slot, place.x);
+  const earlier = slotInfo(slot - 1, place.x);
+  const has = knownBuildings(now.known);
+  const who = { id: person.id, job: person.job, ageYears: (tick - person.birth) / 1440, home: person.home };
+  const plan = planFor(who, info.hour, info.day, info.month, weather, has);
+  const walking = planFor(who, earlier.hour, earlier.day, earlier.month, weather, has).place !== plan.place;
   return (
     <>
-      {plan.doing}, wearing {outfitFor(who, plan, weather, climate.biome).wearing}
+      {walking ? `On the way to ${destination(plan, person.job)}` : plan.doing}, wearing {outfitFor(who, plan, weather, climate.biome).wearing}
       {showWeather && (
         <>
           {" "}· {WEATHER_LABELS[weather.kind].toLowerCase()}, {Math.round(weather.temp)}°C in the {BIOME_NAMES[climate.biome]}

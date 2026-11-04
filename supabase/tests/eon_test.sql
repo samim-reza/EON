@@ -2,7 +2,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = extensions, public;
 
-select plan(68);
+select plan(89);
 
 -- Tests never contain the real God email: point the lock at a throwaway address for this
 -- transaction only (everything below is rolled back).
@@ -225,6 +225,93 @@ select ok((select a.births > 0 and a.population > 0 and a.high is not null and a
 select ok((select sum(a.births) from sim.annals a) = (select count(*) from sim.events e where e.kind = 'birth' and e.tick < (select max(a.year + 1) * 1440 from sim.annals a)),
           'the annals count every birth exactly once');                                                                                      -- 67
 select ok(jsonb_array_length(api.pub_now() -> 'places') > 0 and api.pub_annals() ->> 0 is not null, 'visitors can read places and history'); -- 68
+
+------------------------------------------------------------------------------
+-- Step by step
+------------------------------------------------------------------------------
+select ok((select found_tick is not null from sim.discoveries where id = 'fire'), 'people discover fire first');                            -- 69
+select is((select count(*)::int from sim.discoveries d, unnest(d.needs) n join sim.discoveries y on y.id = n
+           where d.found_tick is not null and (y.found_tick is null or y.found_tick > d.found_tick)), 0, 'nothing is discovered before what it needs'); -- 70
+select is((select count(*)::int from sim.discoveries d where d.found_tick is not null
+           and not exists (select 1 from sim.chronicle c where c.kind = 'discovery' and c.agent_id = d.found_by and c.data ->> 'tech' = d.id)), 0,
+          'every discovery is credited to someone, in the history');                                                                         -- 71
+select sim.p_progress(w.tick) from sim.world w; -- founders who have just arrived get theirs at the next monthly pass
+select is((select count(*)::int from sim.agents a where a.home_id is null and (select tick from sim.world) - a.birth_tick >= 16 * 1440), 0,
+          'once shelter is known, every adult has a home');                                                                                  -- 72
+select ok(not exists (select 1 from jsonb_array_elements(api.pub_geo() -> 'buildings') b where b ->> 2 = 'factory'), 'visitors never see buildings that do not exist yet'); -- 73
+
+select set_config('request.jwt.claims', json_build_object('sub', '22222222-2222-2222-2222-222222222222', 'role', 'authenticated',
+  'aal', 'aal2', 'amr', json_build_array(json_build_object('method', 'totp', 'timestamp', extract(epoch from now())::bigint)))::text, true);
+set local role authenticated;
+select throws_ok($$select api.god_found_settlement(5, 'Stolen')$$, '42501', null, 'a player cannot found a settlement');                     -- 74
+reset role;
+
+select set_config('request.jwt.claims', json_build_object('sub', '11111111-1111-1111-1111-111111111111', 'role', 'authenticated',
+  'aal', 'aal2', 'amr', json_build_array(json_build_object('method', 'totp', 'timestamp', extract(epoch from now())::bigint)))::text, true);
+select set_config('test.site', (select id::text from sim.sites where not taken order by id limit 1), true);
+select set_config('test.mover', (select a.id::text from sim.agents a where a.partner_id is not null order by a.id limit 1), true);
+set local role authenticated;
+select lives_ok($$select set_config('test.town', api.god_found_settlement(current_setting('test.site')::int, 'Newhope')::text, true)$$, 'God founds a settlement'); -- 75
+select lives_ok($$select api.god_move_agent(current_setting('test.mover')::bigint, current_setting('test.town')::int)$$, 'God moves someone there');       -- 76
+reset role;
+select is((select count(*)::int from sim.buildings b join sim.settlements s on s.id = b.settlement_id where s.name = 'Newhope' and b.kind <> 'home' and b.built_tick is not null), 1,
+          'a new village is only a gathering place');                                                                                        -- 77
+select is((select count(*)::int from sim.agents a where a.settlement_id = (select id from sim.settlements where name = 'Newhope')
+           and a.home_id is not null and a.partner_id is not null), 2, 'partners move together, into one new home');                         -- 78
+
+------------------------------------------------------------------------------
+-- The world never waits for God
+------------------------------------------------------------------------------
+create temp table asked on commit drop as
+  select a.id from sim.agents a order by a.id limit 1;
+insert into app.prayers (tick, agent_id, need) select (select tick from sim.world) - 1000, id, 'food' from asked;
+update sim.agents set piety = 100 where id = (select id from asked);
+select sim.p_prayers(w.tick) from sim.world w;
+select isnt((select status from app.prayers where agent_id = (select id from asked) order by id limit 1), 'open', 'an old prayer is answered without God'); -- 79
+
+set local role anon;
+select throws_ok('select api.request_life()', '42501', null, 'visitors cannot ask for a life directly');                                     -- 80
+reset role;
+
+select set_config('request.jwt.claims', json_build_object('sub', '22222222-2222-2222-2222-222222222222', 'role', 'authenticated', 'aal', 'aal1')::text, true);
+set local role authenticated;
+select is((api.request_life() ->> 'status'), 'waiting', 'a player can ask for a life');                                                      -- 81
+select throws_ok('select api.request_life()', 'P0001', 'You already have a life, or are waiting for one', 'one life at a time');             -- 82
+reset role;
+
+insert into sim.pregnancies (mother_id, father_id, conceived_tick, due_tick)
+select a.id, a.partner_id, 100, (select tick + 8 from sim.world) from sim.agents a
+where a.sex = 'F' and a.partner_id is not null and not exists (select 1 from sim.pregnancies g where g.mother_id = a.id and g.outcome is null) order by a.id limit 1;
+update sim.pregnancies set due_tick = (select tick + 8 from sim.world) where outcome is null and soul_id is null;
+update app.souls set requested_tick = (select tick - 1000 from sim.world);
+select sim.p_souls((select tick from sim.world));
+select is((select status from app.souls limit 1), 'assigned', 'a soul left waiting joins a family without God');                             -- 83
+select sim.advance(12);
+select ok((select o.status = 'living' and a.soul_id = o.id and a.controller = 'soul' from app.souls o join sim.agents a on a.id = o.agent_id limit 1),
+          'the soul is born into that family');                                                                                               -- 84
+
+select set_config('request.jwt.claims', json_build_object('sub', '11111111-1111-1111-1111-111111111111', 'role', 'authenticated',
+  'aal', 'aal2', 'amr', json_build_array(json_build_object('method', 'totp', 'timestamp', extract(epoch from now())::bigint)))::text, true);
+select set_config('test.player', (select agent_id::text from app.souls limit 1), true);
+select set_config('test.body', (select a.id::text from sim.agents a where a.soul_id is null and a.occupation = 'farmer' order by a.id limit 1), true);
+set local role authenticated;
+select throws_ok($$select api.god_possess(current_setting('test.player')::bigint, null, 'Obey')$$, 'P0001', 'That life belongs to a player', 'a player''s life is never taken over'); -- 85
+select lives_ok($$select api.god_possess(current_setting('test.body')::bigint, 'healer', 'Peace be with you')$$, 'God can work through someone'); -- 86
+reset role;
+update sim.agents set possessed_until = 1 where controller = 'god';
+select sim.p_souls((select tick from sim.world));
+select is((select count(*)::int from sim.agents where controller = 'god'), 0, 'possession wears off by itself');                              -- 87
+
+-- When God does answer, a prayer for healing heals.
+insert into sim.infections (agent_id, disease_id, since_tick, until_tick)
+select id, 1, 0, 999999 from asked on conflict (agent_id, disease_id) do update set until_tick = 999999;
+insert into app.prayers (tick, agent_id, need) select (select tick from sim.world), id, 'health' from asked;
+select set_config('test.prayer', (select max(id)::text from app.prayers), true);
+set local role authenticated;
+select lives_ok($$select api.god_answer_prayer(current_setting('test.prayer')::bigint, true)$$, 'God can answer a prayer');                   -- 88
+reset role;
+select is((select count(*)::int from sim.infections i join asked a on a.id = i.agent_id where i.until_tick > (select tick from sim.world)), 0,
+          'an answered prayer for healing ends the illness');                                                                                -- 89
 
 select * from finish();
 rollback;

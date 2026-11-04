@@ -95,7 +95,7 @@ export default async function AgentPage(props: PageProps<"/agents/[id]">) {
           {a.alive && a.settlement?.x != null && a.settlement.y != null && (
             <p className="mt-1 text-sm text-ink-3">
               <LiveActivity
-                person={{ id: a.id, job: a.occupation ?? "adult", birth: a.birthTick }}
+                person={{ id: a.id, job: a.occupation ?? "adult", birth: a.birthTick, home: a.homeId ?? null }}
                 place={{ name: a.settlement.name, x: a.settlement.x, y: a.settlement.y }}
                 showWeather
               />

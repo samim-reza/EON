@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useActionState, useTransition } from "react";
 import { formatEonDate } from "@/shared/time";
-import { changePassword, createFounder, genesis, heal, setPaused, setWorld, smite, type ActionResult } from "./actions";
+import { BIOME_NAMES, type Biome } from "@/shared/climate";
+import { answerPrayer, assignSoul, changePassword, createFounder, foundSettlement, genesis, heal, moveAgent, possess, release, setPaused, setWorld, smite, type ActionResult } from "./actions";
 
 export type GodState = {
   world: {
@@ -17,6 +18,12 @@ export type GodState = {
   pregnant: number;
   sick: number;
   settlements: { id: number; name: string; kind: string; pop: number }[];
+  /** The best free land first. */
+  sites?: { id: number; x: number; y: number; biome: Biome | null; river: number; coast: boolean }[];
+  prayers?: { id: number; need: string; tick: number; agent: string; agentId: number; place: string | null }[];
+  souls?: { id: number; tick: number; username: string }[];
+  families?: { id: number; due: number; mother: string; place: string | null }[];
+  possessed?: { id: number; name: string; until: number }[];
   pyramid: { band: number; F: number; M: number }[];
   dbBytes: number;
   audit: { id: number; at: string; actor: string; action: string; target: string | null; tick: number; hash: string }[];
@@ -102,6 +109,12 @@ export function GodConsole({ state }: { state: GodState }) {
   const [healed, healAction, healing] = useActionState(heal, init);
   const [smitten, smiteAction, smiting] = useActionState(smite, init);
   const [founder, founderAction, founding] = useActionState(createFounder, init);
+  const [settled, settleAction, settling] = useActionState(foundSettlement, init);
+  const [moved, moveAction, moving] = useActionState(moveAgent, init);
+  const [answered, answerAction, answering] = useActionState(answerPrayer, init);
+  const [placed, placeAction, placing] = useActionState(assignSoul, init);
+  const [taken, possessAction, taking] = useActionState(possess, init);
+  const [freed, releaseAction] = useActionState(release, init);
   const [pausing, startPause] = useTransition();
 
   if (!w.genesis_at)
@@ -231,6 +244,103 @@ export function GodConsole({ state }: { state: GodState }) {
           <Result s={founder} />
           <button className="btn btn-god w-full" disabled={founding}>Create</button>
         </form>
+        <form action={settleAction} className="panel space-y-3 p-5">
+          <h2 className="font-semibold">Found a settlement</h2>
+          <p className="text-xs text-ink-3">A new village starts as a gathering place. Create founders there, or move people to it.</p>
+          <input name="name" placeholder="Name of the settlement" className="input" maxLength={24} />
+          <select name="site" className="input">
+            {(state.sites ?? []).map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.biome ? BIOME_NAMES[s.biome] : "unknown land"}
+                {s.river > 0 ? ", by a river" : ""}
+                {s.coast ? ", on the coast" : ""} ({Math.round(s.x)}, {Math.round(s.y)})
+              </option>
+            ))}
+          </select>
+          <Result s={settled} />
+          <button className="btn btn-god w-full" disabled={settling}>Found it</button>
+        </form>
+        <form action={moveAction} className="panel space-y-3 p-5">
+          <h2 className="font-semibold">Move someone</h2>
+          <p className="text-xs text-ink-3">Their partner and young children go with them. The id is in the address of their profile.</p>
+          <input name="agent" type="number" min={1} placeholder="Agent id" className="input" />
+          <select name="settlement" className="input">
+            {state.settlements.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+          <Result s={moved} />
+          <button className="btn btn-god w-full" disabled={moving}>Move</button>
+        </form>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="panel space-y-3 p-5">
+          <h2 className="font-semibold">Prayers</h2>
+          <p className="text-xs text-ink-3">Anything left unanswered for 6 hours is answered by the world itself.</p>
+          <Result s={answered} />
+          {(state.prayers ?? []).length === 0 && <p className="text-sm text-ink-3">No prayers are waiting.</p>}
+          <ul className="max-h-80 divide-y divide-line/60 overflow-auto text-sm">
+            {(state.prayers ?? []).map((p) => (
+              <li key={p.id} className="flex items-center justify-between gap-2 py-2">
+                <span className="text-ink-2"><span className="text-ink">{p.agent}</span> asks for {p.need}</span>
+                <form action={answerAction} className="flex shrink-0 gap-1">
+                  <input type="hidden" name="prayer" value={p.id} />
+                  <button name="answer" value="grant" className="btn btn-god" disabled={answering}>Grant</button>
+                  <button name="answer" value="deny" className="btn btn-ghost" disabled={answering}>Deny</button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <form action={placeAction} className="panel space-y-3 p-5">
+          <h2 className="font-semibold">Souls waiting for a life</h2>
+          <p className="text-xs text-ink-3">After 6 hours a soul joins the family whose baby is due soonest.</p>
+          <select name="soul" className="input">
+            {(state.souls ?? []).map((s) => (
+              <option key={s.id} value={s.id}>{s.username}</option>
+            ))}
+          </select>
+          <select name="family" className="input">
+            {(state.families ?? []).map((f) => (
+              <option key={f.id} value={f.id}>{f.mother}&apos;s baby, {formatEonDate(f.due)}{f.place ? `, ${f.place}` : ""}</option>
+            ))}
+          </select>
+          <Result s={placed} />
+          <button className="btn btn-god w-full" disabled={placing || !state.souls?.length || !state.families?.length}>Give this life</button>
+        </form>
+        <div className="space-y-3">
+          <form action={possessAction} className="panel space-y-3 p-5">
+            <h2 className="font-semibold">Possess someone</h2>
+            <p className="text-xs text-ink-3">Act through a person for one EON year, then they return to themselves. Players can&apos;t be possessed.</p>
+            <input name="agent" type="number" min={1} placeholder="Agent id" className="input" />
+            <select name="job" className="input" defaultValue="">
+              <option value="">Keep their work</option>
+              <option value="farmer">Make them a farmer</option>
+              <option value="builder">Make them a builder</option>
+              <option value="healer">Make them a healer</option>
+            </select>
+            <input name="say" placeholder="Say something through them" className="input" maxLength={200} />
+            <Result s={taken} />
+            <button className="btn btn-god w-full" disabled={taking}>Possess</button>
+          </form>
+          {(state.possessed ?? []).length > 0 && (
+            <div className="panel p-4 text-sm">
+              <Result s={freed} />
+              <ul className="space-y-1">
+                {state.possessed!.map((a) => (
+                  <li key={a.id} className="flex items-center justify-between gap-2">
+                    <span>{a.name}</span>
+                    <form action={releaseAction}>
+                      <input type="hidden" name="agent" value={a.id} />
+                      <button className="btn btn-ghost">Release</button>
+                    </form>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="panel p-5">

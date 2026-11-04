@@ -7,10 +7,12 @@ import { localHour } from "./climate";
 import type { Biome, Weather, WeatherKind } from "./climate";
 import { hash01, type BuildingIndex } from "./world";
 
-export type Plan = { place: "home" | "work" | "school" | "market" | "temple"; doing: string; indoors: boolean; asleep?: boolean };
+export type Plan = { place: "home" | "work" | "school" | "market" | "temple" | "hall" | "wild"; doing: string; indoors: boolean; asleep?: boolean };
 
 const WORKPLACE: Record<string, string> = { farmer: "farm", builder: "workshop", healer: "clinic" };
-const AT_WORK: Record<string, string> = { farmer: "Working on the farm", builder: "Building in the workshop", healer: "Treating patients at the clinic" };
+const AT_WORK: Record<string, string> = { farmer: "Working in the field", builder: "Building in the workshop", healer: "Treating patients at the clinic" };
+/** Before the workplace exists, the same people live off the land. */
+const IN_THE_WILD: Record<string, string> = { farmer: "Gathering food in the wild", builder: "Gathering wood", healer: "Looking for healing plants" };
 const STORMS: WeatherKind[] = ["thunderstorm", "downpour", "blizzard", "sandstorm"];
 const WET: WeatherKind[] = ["rain", "sleet", "snow", "thunderstorm", "downpour", "blizzard", "sandstorm"];
 
@@ -21,17 +23,22 @@ const SHELTER: Partial<Record<WeatherKind, string>> = {
   sandstorm: "Sheltering from the sandstorm",
 };
 
-export type Person = { id: number; job: string; ageYears: number };
+/** `home` of null means nobody has built this person a shelter yet. */
+export type Person = { id: number; job: string; ageYears: number; home?: number | null };
+
+/** Which buildings exist where this person lives. */
+export type Has = (kind: string) => boolean;
 
 /** What a person is doing at an hour by the sun. `day` varies the evening; `month` is 0–11. */
-export function planFor(person: Person, hour: number, day: number, month: number, weather: Weather): Plan {
+export function planFor(person: Person, hour: number, day: number, month: number, weather: Weather, has: Has = () => true): Plan {
   const { id, job, ageYears } = person;
   const lark = hash01(id, 3); // some people rise early, others stay up late
   const wake = (ageYears < 3 ? 6.5 : 5.2) + 2 * lark;
   const bed = (ageYears < 13 ? 19.5 : 20.8) + 2.4 * lark;
-  if (hour >= bed || hour < wake) return { place: "home", doing: "Asleep at home", indoors: true, asleep: true };
+  const roofless = person.home === null;
+  if (hour >= bed || hour < wake) return { place: "home", doing: roofless ? "Asleep by the fire" : "Asleep at home", indoors: !roofless, asleep: true };
 
-  const home = (doing: string): Plan => ({ place: "home", doing, indoors: true });
+  const home = (doing: string): Plan => ({ place: "home", doing, indoors: !roofless });
   if (ageYears < 3) return home("At home with family");
 
   const storm = STORMS.includes(weather.kind) || weather.temp <= -15;
@@ -40,36 +47,68 @@ export function planFor(person: Person, hour: number, day: number, month: number
   if (weather.temp >= 37 && midday && job !== "healer") return home("Resting in the shade");
 
   const daytime = hour >= 8 && hour < 17 - lark;
-  if (job === "child" && ageYears >= 6 && hour >= 8 && hour < 14) return { place: "school", doing: "At school", indoors: true };
+  if (job === "child" && ageYears >= 6 && hour >= 8 && hour < 14) {
+    return has("school") ? { place: "school", doing: "At school", indoors: true } : { place: "hall", doing: "Learning from the elders", indoors: false };
+  }
   if (WORKPLACE[job] && daytime) {
+    if (!has(WORKPLACE[job])) return { place: "wild", doing: IN_THE_WILD[job], indoors: false };
     if (job === "farmer" && (month === 10 || month === 11)) return home("Mending tools for spring"); // nothing grows in deep winter
     if (job === "farmer" && month >= 6 && month <= 7) return { place: "work", doing: "Bringing in the harvest", indoors: false };
     return { place: "work", doing: AT_WORK[job], indoors: job !== "farmer" };
   }
-  if (job === "elder" && hour >= 8 && hour < 10.5) return { place: "temple", doing: "Praying at the temple", indoors: true };
+  if (job === "elder" && hour >= 8 && hour < 10.5 && has("temple")) return { place: "temple", doing: "Praying at the temple", indoors: true };
 
   if (hour >= 16 && hour < 19.5 && !WET.includes(weather.kind)) {
     const choice = hash01(id, day + 77);
-    if (choice < 0.25) return { place: "market", doing: "At the market", indoors: false };
-    if (choice < 0.42) return { place: "temple", doing: "At the temple", indoors: true };
+    if (choice < 0.25 && has("market")) return { place: "market", doing: "At the market", indoors: false };
+    if (choice < 0.42 && has("temple")) return { place: "temple", doing: "At the temple", indoors: true };
+    if (choice < 0.6 && has("hall")) return { place: "hall", doing: "Talking at the gathering place", indoors: false };
   }
   return home(WET.includes(weather.kind) ? "Staying in out of the weather" : hour < 8 ? "Getting ready for the day" : "Relaxing at home");
 }
 
+/** Where a plan leads, for "On the way to …". */
+export function destination(plan: Plan, job: string) {
+  switch (plan.place) {
+    case "home":
+      return "home";
+    case "work":
+      return { farmer: "the field", builder: "the workshop", healer: "the clinic" }[job] ?? "work";
+    case "wild":
+      return "the wild";
+    case "hall":
+      return "the gathering place";
+    default:
+      return `the ${plan.place}`;
+  }
+}
+
 type Spot = { x: number; y: number };
 
-const CIVIC: Record<Exclude<Plan["place"], "home">, (job: string) => string> = {
+const CIVIC: Record<"work" | "school" | "market" | "temple" | "hall", (job: string) => string> = {
   work: (job) => WORKPLACE[job] ?? "hall",
   school: () => "school",
   market: () => "market",
   temple: () => "temple",
+  hall: () => "hall",
 };
 
-/** A spot near the building a plan leads to, the same one every time for a person. */
+/** The building a plan leads to, or null for the wild or someone with no home. */
+export function buildingFor(person: { job: string; home: number | null; settlement: number }, plan: Plan, idx: BuildingIndex) {
+  if (plan.place === "wild") return null;
+  if (plan.place === "home") return person.home != null && idx.byId.has(person.home) ? person.home : idx.civicIds.get(`${person.settlement}:hall`) ?? null;
+  return idx.civicIds.get(`${person.settlement}:${CIVIC[plan.place](person.job)}`) ?? null;
+}
+
+/** A spot near where a plan leads, the same one every time for a person. */
 export function spotFor(person: { id: number; job: string; home: number | null; settlement: number }, plan: Plan, idx: BuildingIndex, fallback: Spot): Spot {
-  const home = (person.home != null && idx.byId.get(person.home)) || null;
-  const base = plan.place === "home" ? home : idx.civic.get(`${person.settlement}:${CIVIC[plan.place](person.job)}`) ?? home;
-  const anchor = base ?? fallback;
+  if (plan.place === "wild") {
+    const angle = hash01(person.id, 21) * Math.PI * 2;
+    const reach = 13 + hash01(person.id, 22) * 9;
+    return { x: fallback.x + Math.cos(angle) * reach, y: fallback.y + Math.sin(angle) * reach };
+  }
+  const id = buildingFor(person, plan, idx);
+  const anchor = (id != null && idx.byId.get(id)) || fallback;
   const angle = hash01(person.id, plan.place.length) * Math.PI * 2;
   const reach = 0.5 + hash01(person.id, 99) * (plan.indoors ? 0.9 : 2.8);
   return { x: anchor.x + Math.cos(angle) * reach, y: anchor.y + Math.sin(angle) * reach };

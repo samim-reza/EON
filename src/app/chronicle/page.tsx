@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { EventLine } from "@/components/EventLine";
 import { pub } from "@/lib/pub";
-import type { AnnalEntry, FeedEvent } from "@/shared/types";
+import { AGES } from "@/shared/progress";
+import { formatEonDate } from "@/shared/time";
+import type { AnnalEntry, FeedEvent, Progress } from "@/shared/types";
 
 export const revalidate = 60;
 export const metadata: Metadata = {
@@ -73,12 +75,60 @@ function Year({ a }: { a: AnnalEntry }) {
   );
 }
 
+function RoadOfProgress({ progress }: { progress: Progress }) {
+  const found = progress.discoveries.filter((d) => d.tick !== null);
+  const ahead = progress.discoveries.filter((d) => d.tick === null);
+  const next = ahead[0];
+  const before = found.length ? Math.max(...found.map((d) => d.cost)) : 0;
+  const share = next ? Math.min(100, Math.max(0, ((progress.knowledge - before) / (next.cost - before)) * 100)) : 100;
+  const age = found.length ? Math.max(...found.map((d) => d.age)) : 1;
+  return (
+    <>
+      <h2 className="mt-8 text-lg font-semibold">The road of progress</h2>
+      <p className="mt-1 text-sm text-ink-2">
+        People start with nothing and work everything out for themselves. They are in <span className="text-god">{AGES[age - 1]}</span>.
+      </p>
+      <div className="panel mt-3 p-5">
+        {next && (
+          <div className="mb-4">
+            <div className="flex justify-between text-xs text-ink-3">
+              <span>Next: {next.name}</span>
+              <span>{found.length} of {progress.discoveries.length} discoveries</span>
+            </div>
+            <div className="mt-1 h-1.5 overflow-hidden rounded bg-line/60">
+              <div className="h-full bg-god" style={{ width: `${share}%` }} />
+            </div>
+          </div>
+        )}
+        {found.length === 0 ? (
+          <p className="py-2 text-center text-sm text-ink-3">Nothing has been discovered yet.</p>
+        ) : (
+          <ul className="divide-y divide-line/60 text-sm">
+            {found.map((d) => (
+              <li key={d.id} className="flex justify-between gap-4 py-2">
+                <span className="text-ink-2">
+                  <span className="font-medium text-ink">{d.name}:</span> {d.by ?? "Someone"} {d.story}
+                  {d.place ? ` in ${d.place}` : ""}
+                </span>
+                <span className="shrink-0 font-mono text-[11px] text-ink-3">{formatEonDate(d.tick!)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {ahead.length > 1 && <p className="mt-3 text-xs text-ink-3">Still to come: {ahead.slice(1, 5).map((d) => d.name).join(", ")}, and {Math.max(0, ahead.length - 5)} more.</p>}
+      </div>
+    </>
+  );
+}
+
 export default async function HistoryPage() {
-  const [rows, annals] = await Promise.all([pub.chronicle(200).catch(() => []), pub.annals().catch(() => [])]);
+  const [rows, annals, progress] = await Promise.all([pub.chronicle(200).catch(() => []), pub.annals().catch(() => []), pub.progress().catch(() => null)]);
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
       <h1 className="text-2xl font-semibold">The history of EON</h1>
       <p className="mt-1 text-sm text-ink-2">Everything that shaped this world. Unlike the live feed, this is kept forever.</p>
+
+      {progress && <RoadOfProgress progress={progress} />}
 
       <h2 className="mt-8 text-lg font-semibold">Year by year</h2>
       <div className="panel mt-3 px-5 py-2">

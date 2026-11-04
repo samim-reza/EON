@@ -100,14 +100,19 @@ export function settleOnLand(buildings: BuildingTuple[], settlements: { id: numb
 export type BuildingIndex = {
   byId: Map<number, { x: number; y: number; kind: string; settlement: number }>;
   civic: Map<string, { x: number; y: number }>; // key `${settlement}:${kind}`
+  civicIds: Map<string, number>;
 };
 
 export function indexBuildings(buildings: BuildingTuple[]): BuildingIndex {
   const byId = new Map<number, { x: number; y: number; kind: string; settlement: number }>();
   const civic = new Map<string, { x: number; y: number }>();
+  const civicIds = new Map<string, number>();
   for (const [id, settlement, kind, x, y] of buildings) {
     byId.set(id, { x, y, kind, settlement });
-    if (kind !== "home") civic.set(`${settlement}:${kind}`, { x, y });
+    if (kind !== "home") {
+      civic.set(`${settlement}:${kind}`, { x, y });
+      civicIds.set(`${settlement}:${kind}`, id);
+    }
   }
-  return { byId, civic };
+  return { byId, civic, civicIds };
 }

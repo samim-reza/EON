@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { biomeOf, climateAt, hash3, moonAt, noise3, seasonCurve, springTide, sunElevation, sunTimes, ticksToFullMoon, tideAt, tideLabel, weatherAt, type Biome, type Climate, type Weather } from "./climate";
-import { outfitFor, planFor, type Plan } from "./daily-life";
+import { destination, outfitFor, planFor, type Plan } from "./daily-life";
 import golden from "./params/climate-golden.json";
+import { knownBuildings, roadTier } from "./progress";
 import { makeWaters, makeWetness, sitesWithWater } from "./rivers";
+import { alongPath, buildRoads, linkSettlements, routeBetween } from "./roads";
 import { ticksToHarvest } from "./time";
 import { makeTerrain } from "./world";
 
@@ -298,5 +300,76 @@ describe("rivers", () => {
     expect(sites.some((s) => s[5] > 0)).toBe(true);
     expect(sites.some((s) => s[6])).toBe(true);
     for (const s of sites) expect(s[5]).toBeLessThanOrEqual(1);
+  });
+});
+
+describe("before anything is built", () => {
+  const nothing = () => false;
+  const person = (job: string, ageYears = 30) => ({ id: 8, job, ageYears, home: null });
+
+  it("lives off the land until there is a field or a workshop", () => {
+    expect(planFor(person("farmer"), 10, 40, 3, sky(), nothing).doing).toBe("Gathering food in the wild");
+    expect(planFor(person("builder"), 10, 40, 3, sky(), nothing).doing).toBe("Gathering wood");
+    expect(planFor(person("healer"), 10, 40, 3, sky(), nothing).place).toBe("wild");
+  });
+
+  it("teaches children before there is a school", () => {
+    expect(planFor(person("child", 9), 10, 40, 3, sky(), (kind) => kind === "hall").doing).toBe("Learning from the elders");
+  });
+
+  it("sleeps by the fire until there is a roof", () => {
+    expect(planFor(person("farmer"), 2, 40, 3, sky(), nothing).doing).toBe("Asleep by the fire");
+  });
+
+  it("says where someone is heading", () => {
+    expect(destination({ place: "work", doing: "", indoors: false }, "farmer")).toBe("the field");
+    expect(destination({ place: "hall", doing: "", indoors: false }, "farmer")).toBe("the gathering place");
+  });
+
+  it("knows what the world can build", () => {
+    expect(knownBuildings(["fire"])("school")).toBe(false);
+    expect(knownBuildings(["fire", "writing"])("school")).toBe(true);
+    expect(knownBuildings(["fire"])("hall")).toBe(true);
+    expect(knownBuildings(undefined)("school")).toBe(true);
+    expect(roadTier(["fire"])).toBe(1);
+    expect(roadTier(["roads"])).toBe(2);
+    expect(roadTier(["roads", "paving", "railways"])).toBe(4);
+  });
+});
+
+describe("paths and roads", () => {
+  const places = [
+    { id: 1, x: 100, y: 100, group: 1 },
+    { id: 2, x: 110, y: 100, group: 1 },
+    { id: 3, x: 120, y: 105, group: 1 },
+    { id: 4, x: 100, y: 120, group: 1 },
+    { id: 5, x: 300, y: 300, group: 2 },
+  ];
+  const net = buildRoads(places, new Map([[1, { x: 100, y: 100 }], [2, { x: 300, y: 300 }]]));
+
+  it("joins every building with no spare paths", () => {
+    expect(net.segments).toHaveLength(3); // four buildings, plus a settlement of one
+    expect(net.nodes.size).toBe(5);
+  });
+
+  it("finds the one way between two places, end to end", () => {
+    const route = routeBetween(net, 3, 4);
+    expect(route[0]).toMatchObject({ x: 120, y: 105 });
+    expect(route[route.length - 1]).toMatchObject({ x: 100, y: 120 });
+    expect(route.length).toBeGreaterThan(3); // through the middle of the village, not straight across
+  });
+
+  it("has no road to another settlement yet", () => {
+    expect(routeBetween(net, 1, 5)).toEqual([]);
+  });
+
+  it("walks a path by distance", () => {
+    expect(alongPath([{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }], 0.75)).toEqual({ x: 10, y: 5 });
+  });
+
+  it("will not lay a road across the sea", () => {
+    const island = (x: number) => (x < 400 || x > 600 ? 1 : -1);
+    const linked = linkSettlements([{ id: 1, x: 100, y: 0 }, { id: 2, x: 300, y: 0 }, { id: 3, x: 700, y: 0 }], island);
+    expect(linked).toEqual([[100, 0, 300, 0]]);
   });
 });

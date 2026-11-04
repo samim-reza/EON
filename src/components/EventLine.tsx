@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PLACE_NAMES } from "@/shared/progress";
 import type { FeedEvent } from "@/shared/types";
 import { formatEonDate } from "@/shared/time";
 
@@ -19,12 +20,15 @@ const COLORS: Record<string, string> = {
   became_city: "text-life",
   weather: "text-sick",
   harvest: "text-god",
+  discovery: "text-god",
+  built: "text-life",
+  prayer_answered: "text-god",
 };
 
 const ICONS: Record<string, string> = {
   birth: "✦", death: "✝", union: "♥", wedding: "◈", pregnant: "◌", diagnosis: "⚕", outbreak: "☣",
   genesis: "☀", founders_arrive: "☀", founder_created: "☀", miracle_heal: "✧", founded: "⌂", became_town: "⌂", became_city: "⌂",
-  weather: "☁", harvest: "❧",
+  weather: "☁", harvest: "❧", discovery: "✺", built: "⌂", moved: "→", prayer: "☾", prayer_answered: "✧", spoke: "❝",
 };
 
 function A({ id, name }: { id: number | null; name: string | null }) {
@@ -35,6 +39,8 @@ function A({ id, name }: { id: number | null; name: string | null }) {
     </Link>
   );
 }
+
+const PRAYERS: Record<string, string> = { health: "for healing", food: "for food", child: "for a child", safety: "for safety" };
 
 function weatherStory(d: Record<string, string | number | boolean | undefined>, place: React.ReactNode) {
   const at = place ? <> {place}</> : null;
@@ -92,6 +98,18 @@ export function describe(e: FeedEvent) {
       return <>The Creator healed {a}</>;
     case "weather":
       return <>{weatherStory(d, place)}</>;
+    case "discovery":
+      return <>{a} {String(d.story)}</>;
+    case "prayer":
+      return <>{a} prayed {PRAYERS[String(d.need)] ?? "to The Creator"}</>;
+    case "prayer_answered":
+      return <>The Creator answered {a}&apos;s prayer {PRAYERS[String(d.need)] ?? ""}</>;
+    case "spoke":
+      return <>{a} said: <span className="text-ink">&ldquo;{String(d.said)}&rdquo;</span></>;
+    case "built":
+      return <>{place ?? "A village"} built a new {(PLACE_NAMES[String(d.building)] ?? "building").toLowerCase()}</>;
+    case "moved":
+      return <>{a} moved to {place ?? "a new home"}</>;
     case "harvest":
       return <>{d.good ? <>A bumper harvest filled the stores{place ? <> of {place}</> : null}</> : <>The harvest failed{place ? <> in {place}</> : null}: food will be dear this year</>}</>;
     case "founded":
