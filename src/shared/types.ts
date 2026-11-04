@@ -24,6 +24,28 @@ export type NowState = {
   settlements: number;
   /** God's climate sliders. Absent until the climate migration has run. */
   tune?: { tempShift: number; rainMult: number };
+  /** The largest settlements, and the next babies due. Absent until the history migration has run. */
+  places?: { id: number; name: string; x: number; y: number; pop: number }[];
+  expecting?: { id: number; name: string; dueTick: number }[];
+};
+
+/** One EON year, summed up. Rows are kept forever. */
+export type AnnalEntry = {
+  year: number;
+  population: number;
+  settlements: number;
+  births: number;
+  deaths: number;
+  weddings: number;
+  outbreaks: number;
+  weather: number;
+  good_harvests: number;
+  bad_harvests: number;
+  high: number | null;
+  high_at: string | null;
+  low: number | null;
+  low_at: string | null;
+  headline: { kind: string; place: string | null; data: Record<string, unknown> } | null;
 };
 
 export type FeedEvent = {

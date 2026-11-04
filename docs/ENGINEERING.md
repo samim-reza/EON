@@ -281,6 +281,17 @@ proportional to its weight, because each row draws an exponential waiting time a
 
 **Use it when:** you need weighted sampling in SQL, without computing cumulative totals.
 
+### Rollups: keep the summary, drop the detail
+
+**What:** every event can't be kept forever on a 500 MB database, so everyday events are dropped after 14 days. Before
+they go, each EON year is rolled up into one row of `sim.annals`: counts, the extremes and its biggest story. One row a
+day is nothing, so it is never deleted. The first time anything happens is also copied to the chronicle permanently.
+
+**Why:** old data is mostly read in summary. Nobody needs every birth from Year 3, but they do want to know how many
+there were and what kind of year it was.
+
+**Use it when:** data grows forever but its detail loses value with age. Metrics systems do this as downsampling.
+
 ### Limit how far a new system can reach
 
 **What:** the life table is calibrated and tested. Severe weather could have added its own deaths, which would have

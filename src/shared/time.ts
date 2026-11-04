@@ -27,6 +27,12 @@ export function formatEonDate(tick: number): string {
   return `Year ${d.year}, ${d.monthName} ${d.day}`;
 }
 
+/** Real minutes until the year's harvest, on the first day of the month of Harvest. */
+export function ticksToHarvest(tf: number) {
+  const left = 720 - (((tf % TICKS_PER_YEAR) + TICKS_PER_YEAR) % TICKS_PER_YEAR);
+  return left > 0 ? left : left + TICKS_PER_YEAR;
+}
+
 export function ageYears(birthTick: number, tick: number): number {
   return (tick - birthTick) / TICKS_PER_YEAR;
 }

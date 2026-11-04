@@ -111,7 +111,10 @@ export function EventLine({ e, showDate = true }: { e: FeedEvent; showDate?: boo
       <span className={`w-4 shrink-0 text-center ${COLORS[e.kind] ?? "text-ink-3"}`} aria-hidden>
         {ICONS[e.kind] ?? "·"}
       </span>
-      <span className="flex-1 text-ink-2">{describe(e)}</span>
+      <span className="flex-1 text-ink-2">
+        {describe(e)}
+        {e.data.first ? <span className="text-god"> · a first for EON</span> : null}
+      </span>
       {showDate && <span className="shrink-0 font-mono text-[11px] text-ink-3">{formatEonDate(e.tick)}</span>}
     </li>
   );

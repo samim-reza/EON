@@ -1,29 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { BIOME_NAMES, localHour, moonAt, sunElevation, sunTimes, tideLabel, WEATHER_LABELS, type WeatherKind } from "@/shared/climate";
 import { outfitFor, planFor, slotInfo, SLOTS_PER_TICK } from "@/shared/daily-life";
 import { eonClock, formatAgeExact, formatEonDate, realDuration } from "@/shared/time";
 import type { NowState } from "@/shared/types";
 import { coastalAt, weatherHere } from "./local-climate";
 import { SkyDial } from "./SkyDial";
-import { currentTick, useFocus, useWorld, type Focus } from "./world-time";
-
-/** Re-reads world time once a second. An EON minute lasts 1/6 of a real second, so the clock visibly runs. */
-function useTick(): number | null {
-  useWorld(); // Subscribing is what starts the shared poller; a page may have no other live widget.
-  const [tick, setTick] = useState<number | null>(null);
-  useEffect(() => {
-    const update = () => setTick(currentTick());
-    const first = setTimeout(update, 0);
-    const id = setInterval(update, 1000);
-    return () => {
-      clearTimeout(first);
-      clearInterval(id);
-    };
-  }, []);
-  return tick;
-}
+import { useFocus, useTick, useWorld, type Focus } from "./world-time";
 
 const GLYPH: Record<WeatherKind, string> = {
   clear: "☀", partly: "⛅", cloudy: "☁", overcast: "☁", fog: "≋", drizzle: "☂", rain: "☂", downpour: "☂",
@@ -38,7 +21,7 @@ function hhmm(hour: number) {
 }
 
 /** Sky and weather for a place at a moment. */
-function skyAt(now: NowState, place: Focus, tf: number) {
+export function skyAt(now: NowState, place: Focus, tf: number) {
   const seed = Number(now.seed);
   const { climate, weather } = weatherHere(now, place.x, place.y, tf);
   const sun = sunElevation(tf, climate.lat, place.x);
@@ -52,7 +35,7 @@ function skyAt(now: NowState, place: Focus, tf: number) {
   };
 }
 
-function weatherLine(sky: ReturnType<typeof skyAt>) {
+export function weatherLine(sky: ReturnType<typeof skyAt>) {
   const night = sky.sun < -2;
   const label = WEATHER_LABELS[sky.weather.kind];
   return `${sky.weather.kind === "clear" && night ? "☾" : GLYPH[sky.weather.kind]} ${label === "Clear" && night ? "Clear night" : label}`;

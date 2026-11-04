@@ -24,7 +24,7 @@ export const viewport: Viewport = { themeColor: "#070b14", width: "device-width"
 const nav = [
   { href: "/world", label: "World" },
   { href: "/feed", label: "Live feed" },
-  { href: "/chronicle", label: "Chronicle" },
+  { href: "/chronicle", label: "History" },
   { href: "/about", label: "How EON works" },
 ];
 

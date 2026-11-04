@@ -142,6 +142,14 @@ EON is a real planet, and its climate shapes every life.
   health and mood. Flu follows the cold. Severe weather can only bring forward a death already due within three
   EON months, so the calibrated life expectancy holds.
 
+### Following the story
+
+Visitors can see what is happening now and everything that came before, with no account.
+
+- **Right now:** the weather and what people are doing at the place you're viewing, plus what's coming up, like the next baby due or the next harvest.
+- **Live feed:** every birth, death, storm and failed harvest as it happens, also shown beside the map. Everyday events are kept for 14 days.
+- **History:** one summary of every EON year, kept forever, and the first time anything ever happened.
+
 ## God
 
 There is exactly **one God, forever**: the owner of this world, who appears in-world as **The Creator**.

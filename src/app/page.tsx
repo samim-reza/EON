@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { LiveFeed } from "@/components/LiveFeed";
 import { HeroMap } from "@/components/map/HeroMap";
+import { RightNow } from "@/components/RightNow";
 import { LiveStats, WorldClock } from "@/components/WorldClock";
 import { pub } from "@/lib/pub";
 import type { FeedEvent, NowState } from "@/shared/types";
@@ -54,12 +55,20 @@ export default async function Home() {
           <div className="panel p-4 backdrop-blur-sm">
             <div className="mb-2 flex items-center justify-between">
               <h2 className="font-semibold">Happening now</h2>
-              <Link href="/feed" prefetch={false} className="text-sm text-life hover:underline">
-                Full feed →
-              </Link>
+              <span className="flex gap-3 text-sm">
+                <Link href="/feed" prefetch={false} className="text-life hover:underline">
+                  Full feed →
+                </Link>
+                <Link href="/chronicle" prefetch={false} className="text-life hover:underline">
+                  History →
+                </Link>
+              </span>
+            </div>
+            <div className="mb-2 border-b border-line/60 pb-3 empty:hidden">
+              <RightNow initial={now} />
             </div>
             {now?.genesis ? (
-              <LiveFeed initial={feed} importance={1} limit={6} />
+              <LiveFeed initial={feed} importance={1} limit={3} />
             ) : (
               <p className="py-8 text-center text-ink-3">The void. EON awaits its Creator.</p>
             )}

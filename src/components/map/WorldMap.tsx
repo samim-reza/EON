@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { LiveFeed } from "@/components/LiveFeed";
+import { RightNow } from "@/components/RightNow";
 import { LiveActivity, LiveAge, WorldClock } from "@/components/WorldClock";
 import { climateOf } from "@/components/local-climate";
-import { currentTick, setFocus, useWorld } from "@/components/world-time";
+import { currentTick, setFocus, setResidents, useWorld, type Resident } from "@/components/world-time";
 import { localHour, NO_TUNING, seasonCurve, smooth, tideAt, weatherAt, yearFraction, type Weather } from "@/shared/climate";
 import { outfitFor, planFor, slotInfo, SLOTS_PER_TICK, spotFor, type Outfit, type Plan } from "@/shared/daily-life";
 import { TILE_UNITS } from "@/shared/terrain-pixels";
@@ -170,6 +172,16 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
     });
   }, [agents, idx, settlementById]);
 
+  useEffect(() => {
+    const byPlace = new Map<number, Resident[]>();
+    for (const a of agents) {
+      const list = byPlace.get(a.settlement);
+      if (list) list.push(a);
+      else byPlace.set(a.settlement, [a]);
+    }
+    setResidents(byPlace);
+  }, [agents]);
+
   const stops = useMemo(() => [...(geo?.settlements ?? [])].sort((a, b) => b.pop - a.pop).slice(0, 6), [geo]);
 
   useEffect(() => {
@@ -302,7 +314,7 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
         if (label !== shownStop) {
           shownStop = label;
           setStop({ name: at.name, pop: at.pop });
-          setFocus({ name: at.name, x: at.x, y: at.y });
+          setFocus({ id: at.id, name: at.name, x: at.x, y: at.y });
         }
       }
       // The hero keeps the village clear of the headline and of the feed.
@@ -317,7 +329,7 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
       if (!hero && ts - lastFocusCheck > 700 && geo?.settlements.length) {
         lastFocusCheck = ts;
         const nearest = geo.settlements.reduce((best, s) => (Math.hypot(s.x - c.x, s.y - c.y) < Math.hypot(best.x - c.x, best.y - c.y) ? s : best));
-        setFocus({ name: nearest.name, x: nearest.x, y: nearest.y });
+        setFocus({ id: nearest.id, name: nearest.name, x: nearest.x, y: nearest.y });
       }
       if (terrain.current) {
         ctx.imageSmoothingEnabled = true;
@@ -651,6 +663,13 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
           )}
         </div>
         {error && <div className="panel px-3 py-2 text-xs text-sick">{error}</div>}
+        <div className="panel pointer-events-auto hidden w-64 p-3 lg:block">
+          <RightNow />
+        </div>
+        <div className="panel pointer-events-auto hidden max-h-56 w-64 overflow-auto px-3 py-2 lg:block">
+          <h2 className="text-xs uppercase tracking-widest text-ink-3">Happening now</h2>
+          <LiveFeed importance={1} limit={4} compact />
+        </div>
       </div>
 
       <div className="absolute bottom-3 left-3 hidden gap-3 rounded-lg bg-bg/70 px-3 py-2 text-[11px] text-ink-2 sm:flex">

@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { biomeOf, climateAt, hash3, moonAt, noise3, seasonCurve, springTide, sunElevation, sunTimes, tideAt, tideLabel, weatherAt, type Biome, type Climate, type Weather } from "./climate";
+import { biomeOf, climateAt, hash3, moonAt, noise3, seasonCurve, springTide, sunElevation, sunTimes, ticksToFullMoon, tideAt, tideLabel, weatherAt, type Biome, type Climate, type Weather } from "./climate";
 import { outfitFor, planFor, type Plan } from "./daily-life";
 import golden from "./params/climate-golden.json";
 import { makeWaters, makeWetness, sitesWithWater } from "./rivers";
+import { ticksToHarvest } from "./time";
 import { makeTerrain } from "./world";
 
 const TUNE = { tempShift: 1.5, rainMult: 1.2 };
@@ -136,6 +137,23 @@ describe("weather", () => {
     const hot = weatherAt(17, climate({ wet: 0.05 }), 400, 400, 500);
     const humid = weatherAt(17, climate({ wet: 0.95 }), 400, 400, 500);
     expect(hot.high - hot.low).toBeGreaterThan(humid.high - humid.low);
+  });
+});
+
+describe("what is coming up", () => {
+  it("counts down to the next full moon", () => {
+    for (const tf of [0, 57.5, 300, 1234.25]) {
+      const left = ticksToFullMoon(5, tf);
+      expect(left).toBeLessThanOrEqual(118.12);
+      expect(moonAt(5, tf + left, 35, 500).light).toBeCloseTo(1, 6);
+    }
+  });
+
+  it("counts down to the next harvest, then the one after", () => {
+    expect(ticksToHarvest(0)).toBe(720);
+    expect(ticksToHarvest(700)).toBe(20);
+    expect(ticksToHarvest(721)).toBe(1439);
+    expect(ticksToHarvest(1440 * 3 + 700)).toBe(20);
   });
 });
 

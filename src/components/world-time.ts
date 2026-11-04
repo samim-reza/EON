@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { advanceAnchor, tickAt, type TickAnchor } from "@/shared/time";
 import type { NowState } from "@/shared/types";
 
@@ -85,7 +85,7 @@ export function currentTick(): number | null {
   return now && anchor ? tickAt(anchor, performance.now(), now.paused) : null;
 }
 
-export type Focus = { name: string; x: number; y: number };
+export type Focus = { id?: number; name: string; x: number; y: number };
 
 let focus: Focus | null = null;
 const focusListeners = new Set<() => void>();
@@ -105,3 +105,39 @@ function subscribeFocus(listener: () => void) {
 }
 
 export const useFocus = () => useSyncExternalStore(subscribeFocus, () => focus, () => null);
+
+export type Resident = { id: number; name: string; job: string; birth: number };
+
+let residents: ReadonlyMap<number, Resident[]> = new Map();
+const residentListeners = new Set<() => void>();
+
+/** Everyone the map knows about, by settlement. Pages with a map share it instead of fetching again. */
+export function setResidents(next: ReadonlyMap<number, Resident[]>) {
+  residents = next;
+  residentListeners.forEach((listener) => listener());
+}
+
+function subscribeResidents(listener: () => void) {
+  residentListeners.add(listener);
+  return () => {
+    residentListeners.delete(listener);
+  };
+}
+
+export const useResidents = () => useSyncExternalStore(subscribeResidents, () => residents, () => residents);
+
+/** Re-reads world time once a second. An EON minute lasts 1/6 of a real second, so the clock visibly runs. */
+export function useTick(): number | null {
+  useWorld(); // Subscribing is what starts the shared poller; a page may have no other live widget.
+  const [tick, setTick] = useState<number | null>(null);
+  useEffect(() => {
+    const update = () => setTick(currentTick());
+    const first = setTimeout(update, 0);
+    const id = setInterval(update, 1000);
+    return () => {
+      clearTimeout(first);
+      clearInterval(id);
+    };
+  }, []);
+  return tick;
+}

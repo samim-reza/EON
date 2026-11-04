@@ -4,10 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import type { FeedEvent } from "@/shared/types";
 import { EventLine } from "./EventLine";
 
-type Props = { initial: FeedEvent[]; importance?: 1 | 2 | 3; pageable?: boolean; limit?: number };
+type Props = { initial?: FeedEvent[]; importance?: 1 | 2 | 3; pageable?: boolean; limit?: number; compact?: boolean };
 
 /** Newest-first event stream. Head is refreshed from the CDN every 30 s while visible. */
-export function LiveFeed({ initial, importance = 2, pageable = false, limit }: Props) {
+export function LiveFeed({ initial = [], importance = 2, pageable = false, limit, compact = false }: Props) {
   const [events, setEvents] = useState(initial);
   const [loadingMore, setLoadingMore] = useState(false);
   const [done, setDone] = useState(false);
@@ -23,14 +23,18 @@ export function LiveFeed({ initial, importance = 2, pageable = false, limit }: P
         const add = fresh.filter((e) => !seen.current.has(e.id));
         if (add.length) {
           add.forEach((e) => seen.current.add(e.id));
-          setEvents((prev) => [...add, ...prev].slice(0, limit ?? 400));
+          setEvents((prev) => [...add, ...prev].sort((a, b) => b.tick - a.tick || b.id - a.id).slice(0, limit ?? 400));
         }
       } catch {
         /* ignore */
       }
     };
+    const first = seen.current.size ? undefined : setTimeout(refresh, 0); // nothing rendered by the server
     const id = setInterval(refresh, 30_000);
-    return () => clearInterval(id);
+    return () => {
+      clearTimeout(first);
+      clearInterval(id);
+    };
   }, [importance, limit]);
 
   const more = async () => {
@@ -54,7 +58,7 @@ export function LiveFeed({ initial, importance = 2, pageable = false, limit }: P
     <div>
       <ul className="divide-y divide-line/60">
         {(limit ? events.slice(0, limit) : events).map((e) => (
-          <EventLine key={e.id} e={e} />
+          <EventLine key={e.id} e={e} showDate={!compact} />
         ))}
       </ul>
       {pageable && !done && (

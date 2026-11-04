@@ -184,6 +184,11 @@ export function moonAt(seed: number, tf: number, lat: number, x: number): Moon {
   };
 }
 
+/** Ticks until the next full moon. */
+export function ticksToFullMoon(seed: number, tf: number) {
+  return (((0.5 - moonPhase(seed, tf)) % 1) + 1) % 1 * SYNODIC_TICKS;
+}
+
 /** 1 at new and full moon, when sun and moon pull together; 0 at the quarters. */
 export const springTide = (seed: number, tf: number) => Math.abs(Math.cos(TAU * moonPhase(seed, tf)));
 

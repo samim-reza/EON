@@ -1,6 +1,6 @@
 import "server-only";
 import { adminClient } from "@/lib/supabase/admin";
-import type { AgentDetail, ChronicleEntry, FamilyTree, FeedEvent, Geo, NowState, Roster, StatsRow } from "@/shared/types";
+import type { AgentDetail, AnnalEntry, ChronicleEntry, FamilyTree, FeedEvent, Geo, NowState, Roster, StatsRow } from "@/shared/types";
 
 async function rpc<T>(fn: string, args?: Record<string, unknown>): Promise<T> {
   const { data, error } = await adminClient().rpc(fn, args ?? {});
@@ -19,4 +19,5 @@ export const pub = {
   family: (id: number) => rpc<FamilyTree>("pub_family", { p_id: id }),
   stats: (from: number, to: number, step = 120) => rpc<StatsRow[]>("pub_stats", { p_from: from, p_to: to, p_step: step }),
   chronicle: (limit = 100) => rpc<ChronicleEntry[]>("pub_chronicle", { p_limit: limit }),
+  annals: (limit = 120) => rpc<AnnalEntry[]>("pub_annals", { p_limit: limit }),
 };

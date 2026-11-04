@@ -2,7 +2,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = extensions, public;
 
-select plan(61);
+select plan(68);
 
 -- Tests never contain the real God email: point the lock at a throwaway address for this
 -- transaction only (everything below is rolled back).
@@ -212,6 +212,19 @@ update sim.settlements set river = 1, soil = 0, temp_mean = 18, temp_swing = 8;
 select sim.p_weather(w.tick) from sim.world w;
 select ok((select min(s.soil) >= 0.29 from sim.settlements s where exists (select 1 from sim.agents a where a.settlement_id = s.id)),
           'river water irrigates when no rain falls');                                                                                   -- 61
+
+------------------------------------------------------------------------------
+-- What visitors can look back on
+------------------------------------------------------------------------------
+select is((select count(*)::int from sim.chronicle where kind = 'birth' and (data ->> 'first')::boolean), 1, 'the first birth is history');  -- 62
+select is((select count(*)::int from sim.chronicle where kind = 'birth'), 1, 'later births are not');                                        -- 63
+select ok((select (data ->> 'first')::boolean from sim.events where kind = 'birth' order by tick, id limit 1), 'the first birth is marked as a first'); -- 64
+select ok((select count(*) >= 7 from sim.annals), 'every finished year has its row in the annals');                                          -- 65
+select ok((select a.births > 0 and a.population > 0 and a.high is not null and a.low <= a.high from sim.annals a order by a.year desc limit 1),
+          'a year sums up its births, people and extremes');                                                                                 -- 66
+select ok((select sum(a.births) from sim.annals a) = (select count(*) from sim.events e where e.kind = 'birth' and e.tick < (select max(a.year + 1) * 1440 from sim.annals a)),
+          'the annals count every birth exactly once');                                                                                      -- 67
+select ok(jsonb_array_length(api.pub_now() -> 'places') > 0 and api.pub_annals() ->> 0 is not null, 'visitors can read places and history'); -- 68
 
 select * from finish();
 rollback;
