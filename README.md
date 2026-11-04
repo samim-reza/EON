@@ -12,6 +12,8 @@ in a world that never stops, whether anyone is watching or not.
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6)
 ![Supabase](https://img.shields.io/badge/Supabase-Postgres%2017-3ecf8e)
 
+### [▶ Watch the world live: eon-rose.vercel.app](https://eon-rose.vercel.app)
+
 </div>
 
 ---
