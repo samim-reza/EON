@@ -104,7 +104,7 @@ create or replace function sim.p_community(p_tick integer) returns void
 language plpgsql security definer set search_path = '' as $$
 declare
   w sim.world;
-  b smallint := (p_tick % 120)::smallint;
+  slot smallint := (p_tick % 120)::smallint; -- not "b": sim.relationships has a column of that name
   adult integer := 16 * 1440;
   r record; nb record;
   temper double precision; reason text; fight boolean; victim bigint;
@@ -115,7 +115,7 @@ begin
     select a.id, a.settlement_id, a.partner_id, a.trait_a, a.trait_n, a.trait_e, a.honesty, a.wealth, a.reputation, a.health,
            s.food, coalesce(s.wx_high, 20) as hot, s.pop
     from sim.agents a join sim.settlements s on s.id = a.settlement_id
-    where a.bucket = b and p_tick - a.birth_tick >= adult
+    where a.bucket = slot and p_tick - a.birth_tick >= adult
     order by a.id
   loop
     continue when not exists (select 1 from sim.agents x where x.id = r.id); -- lost in a fight earlier this tick
@@ -171,7 +171,7 @@ begin
   for r in
     select l.a, l.b, x.trait_a as ta, y.trait_a as tb
     from sim.relationships l join sim.agents x on x.id = l.a join sim.agents y on y.id = l.b
-    where l.kind = 'rival' and x.bucket = b
+    where l.kind = 'rival' and x.bucket = slot
   loop
     if sim.rnd(w.seed, 'peace', r.a, p_tick) < 0.12 * (r.ta + r.tb) / 200.0 then
       perform sim.reconcile(p_tick, r.a, r.b);
