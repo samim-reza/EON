@@ -246,7 +246,7 @@ EON is open source, so this design has to hold up with all of its code in public
   - Interactive pages get a per-request **nonce CSP** with `strict-dynamic`, and watch pages get a strict static CSP.
   - Every page sends HSTS (preload), `nosniff`, `frame-ancestors 'none'`, a strict referrer policy, a deny-all
     permissions policy and COOP.
-- **Abuse resistance.** A Postgres rate limiter guards RPCs, and sign-up has an IP limit and a honeypot. Public endpoints reject unknown or malformed query
+- **Abuse resistance.** A Postgres rate limiter guards RPCs. Sign-up has an IP limit, a honeypot and a proof-of-work check that costs a bot real time for every account. Public endpoints reject unknown or malformed query
   parameters so nobody can bust the cache, and the cron endpoint uses a constant-time bearer check.
 - **Player AI keys (M2).** Keys are encrypted with AES-256-GCM. The master key exists only in the Vercel
   environment, so neither a database dump nor the environment alone reveals a key.
@@ -325,6 +325,7 @@ Copy `.env.example` to `.env.local`. Never commit real values.
 | `SIGNUP_EMAIL_CONFIRMATION` | set to `on` to send confirmation emails, which needs custom SMTP in Supabase. Otherwise the sign-up form creates accounts straight away |
 | `CRON_SECRET` | bearer token for `/api/cron/daily` |
 | `ANTHROPIC_API_KEY` | Claude key for the world's writing |
+| `ANTHROPIC_WORKSPACE_ID` | only with an organization-wide key: the workspace to bill |
 | `MINDS_SECRET` | signs the database's request to wake the AI worker |
 | `BYOK_KEK` | 32-byte master key that encrypts player AI keys (M2) |
 

@@ -1,11 +1,22 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { keepInputs } from "@/components/keep-inputs";
+import { solvePow, type PowChallenge } from "@/shared/pow";
 import { signUp, type SignupState } from "./actions";
 
-export function SignupForm() {
+export function SignupForm({ challenge }: { challenge: PowChallenge }) {
   const [state, action, pending] = useActionState<SignupState, FormData>(signUp, { error: null, sent: false });
+  const [nonce, setNonce] = useState<number | null>(null);
+
+  // Starts as soon as the page opens, so it is usually done before the form is.
+  useEffect(() => {
+    let live = true;
+    void solvePow(challenge).then((found) => live && setNonce(found));
+    return () => {
+      live = false;
+    };
+  }, [challenge]);
 
   if (state.sent) {
     return (
@@ -52,8 +63,13 @@ export function SignupForm() {
         <span>I am at least 13 years old.</span>
       </label>
       {state.error && <p className="text-sm text-death">{state.error}</p>}
-      <button className="btn btn-life w-full" disabled={pending}>
-        {pending ? "Creating your account…" : "Create account"}
+      <input type="hidden" name="pow_salt" value={challenge.salt} />
+      <input type="hidden" name="pow_expires" value={challenge.expires} />
+      <input type="hidden" name="pow_bits" value={challenge.bits} />
+      <input type="hidden" name="pow_sig" value={challenge.sig} />
+      <input type="hidden" name="pow_nonce" value={nonce ?? ""} />
+      <button className="btn btn-life w-full" disabled={pending || nonce === null}>
+        {pending ? "Creating your account…" : nonce === null ? "Getting ready…" : "Create account"}
       </button>
     </form>
   );

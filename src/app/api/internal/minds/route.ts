@@ -18,12 +18,16 @@ export async function POST(req: Request) {
   const { data, error } = await db.rpc("minds_claim", { p_limit: BATCH });
   if (error) return problem(503, "database unavailable");
   const jobs = data as MindJob[];
-  const results = await Promise.all(
+  const lines = await Promise.all(
     jobs.map(async (job) => {
       const line = await writeLine(job);
       await db.rpc("minds_finish", { p_job: job.id, p_text: line.text, p_in: line.tokensIn, p_out: line.tokensOut });
-      return line.text !== null;
+      return line;
     }),
   );
-  return json({ claimed: jobs.length, written: results.filter(Boolean).length }, { kind: "none" });
+  // The database keeps this reply for a day (net._http_response), and the log keeps it too.
+  const problems: Record<string, number> = {};
+  for (const line of lines) if (line.problem) problems[line.problem] = (problems[line.problem] ?? 0) + 1;
+  if (Object.keys(problems).length) console.error("minds: some lines were not written", problems);
+  return json({ claimed: jobs.length, written: lines.filter((l) => l.text !== null).length, problems }, { kind: "none" });
 }

@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getMe } from "@/lib/auth";
+import { clientKey, powKey } from "@/lib/client-key";
+import { makeChallenge } from "@/lib/pow-check";
 import { SignupForm } from "./SignupForm";
 
 export const metadata: Metadata = {
@@ -20,7 +22,7 @@ export default async function SignupPage() {
         newborn.
       </p>
       <div className="panel mt-6 p-5">
-        <SignupForm />
+        <SignupForm challenge={makeChallenge(powKey(), await clientKey())} />
       </div>
       <p className="mt-4 text-center text-sm text-ink-2">
         Already have an account?{" "}

@@ -1,10 +1,11 @@
 "use server";
 
-import { createHmac } from "node:crypto";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { clientKey, powKey } from "@/lib/client-key";
 import { env } from "@/lib/env";
+import { checkSolution } from "@/lib/pow-check";
 import { rememberNav } from "@/lib/nav-session";
 import { adminClient } from "@/lib/supabase/admin";
 import { createUserClient } from "@/lib/supabase/server";
@@ -82,8 +83,10 @@ export async function signUp(_prev: SignupState, form: FormData): Promise<Signup
   const { username, email, password } = parsed.data;
 
   const h = await headers();
-  const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "unknown";
-  const client = createHmac("sha256", env().SUPABASE_SECRET_KEY).update(ip).digest("hex");
+  const client = await clientKey();
+  const work = checkSolution(powKey(), client, Object.fromEntries(form));
+  if (work === "expired") return fail("This page has been open a while. Reload it and try again.");
+  if (work !== "ok") return fail("Please wait a moment for the page to finish loading, then try again.");
   const { data: gate, error: gateError } = await adminClient().rpc("signup_gate", { p_client: client, p_username: username, p_email: email });
   if (gateError) return fail(gateError.code === "P0429" ? "Too many attempts from your network. Try again in an hour." : "Sign-up is unavailable right now.");
   if (gate !== "ok") return fail(GATE_ERRORS[gate] ?? "Check the form and try again.");
