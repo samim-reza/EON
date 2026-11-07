@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import { AuthNav } from "@/components/AuthNav";
+import { FramedLinks } from "@/components/FramedLinks";
 import { siteUrl } from "@/lib/site";
 import "./globals.css";
 
@@ -32,6 +33,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
+        <FramedLinks />
         <header className="sticky top-0 z-40 border-b border-line/70 bg-bg/80 backdrop-blur">
           <div className="mx-auto flex max-w-6xl items-center gap-6 px-4 py-3">
             <Link href="/" prefetch={false} className="flex items-center gap-2 font-semibold tracking-[0.3em] text-ink">

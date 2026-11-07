@@ -14,14 +14,16 @@ const staticCsp = [
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
-  "frame-ancestors 'none'",
+  // Only EON's itch.io page may show watch pages in a frame: the project page on *.itch.io and the
+  // game frame on *.itch.zone. Nobody is signed in there (session cookies are SameSite=Lax), and
+  // the interactive routes keep frame-ancestors 'none' and X-Frame-Options DENY.
+  "frame-ancestors https://itch.io https://*.itch.io https://*.itch.zone",
   ...(isDev ? [] : ["upgrade-insecure-requests"]),
 ].join("; ");
 
 const securityHeaders = [
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
   { key: "X-Content-Type-Options", value: "nosniff" },
-  { key: "X-Frame-Options", value: "DENY" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()" },
   { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
@@ -41,6 +43,11 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },
+      {
+        // the interactive routes are never framed (proxy.ts also sends frame-ancestors 'none')
+        source: "/((?:me|god|login|signup|auth)(?:/.*)?)",
+        headers: [{ key: "X-Frame-Options", value: "DENY" }],
+      },
       {
         // every route except the interactive ones (those get a nonce CSP from proxy.ts)
         source: "/((?!(?:me|god|login|signup|auth)(?:/|$)).*)",

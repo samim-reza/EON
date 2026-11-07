@@ -244,8 +244,9 @@ EON is open source, so this design has to hold up with all of its code in public
 - **Hardened web layer.**
   - Session cookies are `httpOnly`, `Secure` and `SameSite=Lax`.
   - Interactive pages get a per-request **nonce CSP** with `strict-dynamic`, and watch pages get a strict static CSP.
-  - Every page sends HSTS (preload), `nosniff`, `frame-ancestors 'none'`, a strict referrer policy, a deny-all
-    permissions policy and COOP.
+  - Every page sends HSTS (preload), `nosniff`, a strict referrer policy, a deny-all permissions policy and COOP.
+  - Interactive pages can never be framed (`frame-ancestors 'none'` and `X-Frame-Options: DENY`). Watch pages
+    can be framed only by EON's itch.io page.
 - **Abuse resistance.** A Postgres rate limiter guards RPCs. Sign-up has an IP limit, a honeypot and a proof-of-work check that costs a bot real time for every account. Public endpoints reject unknown or malformed query
   parameters so nobody can bust the cache, and the cron endpoint uses a constant-time bearer check.
 - **Player AI keys (M2).** Keys are encrypted with AES-256-GCM. The master key exists only in the Vercel
