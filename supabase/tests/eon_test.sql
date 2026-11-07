@@ -367,12 +367,12 @@ select lives_ok($$select sim.p_community((select tick from sim.world))$$, 'the c
 -- Hardening
 ------------------------------------------------------------------------------
 insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, raw_user_meta_data, created_at, updated_at)
-values ('00000000-0000-0000-0000-000000000000', '44444444-4444-4444-4444-444444444444', 'authenticated', 'authenticated',
+values ('00000000-0000-0000-0000-000000000000', '55555555-5555-5555-5555-555555555555', 'authenticated', 'authenticated',
         'pending@example.com', 'x', null, '{"username":"pending"}', now(), now());
-select is((select count(*)::int from app.profiles where user_id = '44444444-4444-4444-4444-444444444444'), 0,
+select is((select count(*)::int from app.profiles where user_id = '55555555-5555-5555-5555-555555555555'), 0,
           'no username is taken before the address is confirmed');                                                                           -- 106
-update auth.users set email_confirmed_at = now() where id = '44444444-4444-4444-4444-444444444444';
-select is((select username from app.profiles where user_id = '44444444-4444-4444-4444-444444444444'), 'pending',
+update auth.users set email_confirmed_at = now() where id = '55555555-5555-5555-5555-555555555555';
+select is((select username from app.profiles where user_id = '55555555-5555-5555-5555-555555555555'), 'pending',
           'confirming the address creates the profile');                                                                                      -- 107
 select is(api.signup_gate(repeat('a', 64), 'newname', 'new@example.com', repeat('b', 24)), 'ok', 'a fresh proof of work passes');            -- 108
 select is(api.signup_gate(repeat('a', 64), 'newname', 'new@example.com', repeat('b', 24)), 'replayed', 'the same proof of work is refused twice'); -- 109
