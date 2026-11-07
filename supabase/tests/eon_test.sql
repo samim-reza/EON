@@ -2,7 +2,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = extensions, public;
 
-select plan(96);
+select plan(105);
 
 -- Tests never contain the real God email: point the lock at a throwaway address for this
 -- transaction only (everything below is rolled back).
@@ -330,6 +330,38 @@ select is((select e.data ->> 'voice' from llm.jobs j join sim.events e on e.tick
 select ok((select b.spent = 0.00003 and b.lines = 1 from llm.budget b where b.day = current_date), 'the real cost is settled');              -- 95
 update sim.world set llm_cap = 0;
 select is(jsonb_array_length(api.minds_claim(3)), 0, 'nothing is spent past the cap');                                                       -- 96
+
+------------------------------------------------------------------------------
+-- Neighbours
+------------------------------------------------------------------------------
+create temp table pair on commit drop as
+  select (array_agg(q.id order by q.id))[1] as x, (array_agg(q.id order by q.id))[2] as y
+  from (select a.id from sim.agents a
+        where a.soul_id is null and a.settlement_id = (select settlement_id from sim.agents order by id limit 1)
+          and (select tick from sim.world) - a.birth_tick >= 16 * 1440
+        order by a.id limit 2) q;
+select ok((select sim.quarrel_reason(0.9999) is not null), 'every draw gives a reason to fall out');                                        -- 97
+select sim.quarrel(w.tick, p.x, p.y, 'a stray goat', false) from sim.world w, pair p;
+select is((select l.kind from sim.relationships l, pair p where l.a = p.x and l.b = p.y), 'rival', 'a quarrel leaves a grudge');            -- 98
+select ok((select count(*) > 0 from sim.chronicle c where c.kind = 'quarrel' and (c.data ->> 'first')::boolean), 'the first quarrel is history'); -- 99
+update sim.relationships set affinity = -60 from pair p where a = p.x and b = p.y;
+select set_config('test.h0', (select a.health::text from sim.agents a, pair p where a.id = p.x), true);
+select sim.quarrel(w.tick, p.x, p.y, 'a borrowed tool', true) from sim.world w, pair p;
+select ok((select a.health < current_setting('test.h0')::int from sim.agents a, pair p where a.id = p.x), 'a fight hurts');                   -- 100
+update sim.agents set wealth = 0 from pair p where id = p.x;
+update sim.agents set wealth = 500 from pair p where id = p.y;
+select sim.steal(w.tick, p.x, p.y, 80, true) from sim.world w, pair p;
+select is((select a.wealth from sim.agents a, pair p where a.id = p.y), 520::bigint, 'a caught thief pays back, and a fine on top');          -- 101
+select sim.steal(w.tick, p.x, p.y, 50, false) from sim.world w, pair p;
+select ok((select e.other_id is null and e.agent_id = p.y from sim.events e, pair p where e.kind = 'theft' order by e.id desc limit 1),
+          'a thief who gets away stays unknown');                                                                                             -- 102
+select sim.reconcile(w.tick, p.x, p.y) from sim.world w, pair p;
+select is((select l.kind from sim.relationships l, pair p where l.a = p.x and l.b = p.y), 'friend', 'making peace turns a rival into a friend'); -- 103
+update sim.relationships set kind = 'rival', affinity = -60 from pair p where a = p.x and b = p.y;
+insert into app.prayers (tick, agent_id, need) select w.tick, p.x, 'peace' from sim.world w, pair p;
+select sim.answer_prayer((select max(id) from app.prayers), true, 'test', w.tick) from sim.world w;
+select is((select l.kind from sim.relationships l, pair p where l.a = p.x and l.b = p.y), 'friend', 'an answered prayer for peace ends the grudge'); -- 104
+select lives_ok($$select sim.p_community((select tick from sim.world))$$, 'the community pass runs');                                        -- 105
 
 select * from finish();
 rollback;

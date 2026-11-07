@@ -2,6 +2,7 @@ import Link from "next/link";
 import { LiveFeed } from "@/components/LiveFeed";
 import { HeroMap } from "@/components/map/HeroMap";
 import { RightNow } from "@/components/RightNow";
+import { YourPeople } from "@/components/YourPeople";
 import { LiveStats, WorldClock } from "@/components/WorldClock";
 import { pub } from "@/lib/pub";
 import type { FeedEvent, NowState } from "@/shared/types";
@@ -75,6 +76,8 @@ export default async function Home() {
           </div>
         </div>
       </section>
+
+      <YourPeople />
 
       <section className="mx-auto grid max-w-6xl gap-6 px-4 py-14 lg:grid-cols-[1.4fr_1fr]">
         <div className="panel p-5 text-sm text-ink-2">

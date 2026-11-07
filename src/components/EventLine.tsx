@@ -23,12 +23,19 @@ const COLORS: Record<string, string> = {
   discovery: "text-god",
   built: "text-life",
   prayer_answered: "text-god",
+  friends: "text-love",
+  quarrel: "text-sick",
+  fight: "text-death",
+  theft: "text-sick",
+  judged: "text-god",
+  reconciled: "text-love",
 };
 
 const ICONS: Record<string, string> = {
   birth: "✦", death: "✝", union: "♥", wedding: "◈", pregnant: "◌", diagnosis: "⚕", outbreak: "☣",
   genesis: "☀", founders_arrive: "☀", founder_created: "☀", miracle_heal: "✧", founded: "⌂", became_town: "⌂", became_city: "⌂",
   weather: "☁", harvest: "❧", discovery: "✺", built: "⌂", moved: "→", prayer: "☾", prayer_answered: "✧", spoke: "❝", voice: "✎",
+  friends: "♡", quarrel: "✕", fight: "⚔", theft: "⊘", judged: "⚖", reconciled: "✽",
 };
 
 function A({ id, name }: { id: number | null; name: string | null }) {
@@ -40,7 +47,13 @@ function A({ id, name }: { id: number | null; name: string | null }) {
   );
 }
 
-const PRAYERS: Record<string, string> = { health: "for healing", food: "for food", child: "for a child", safety: "for safety" };
+const PRAYERS: Record<string, string> = { health: "for healing", food: "for food", child: "for a child", safety: "for safety", peace: "for peace" };
+
+/** "them" when the event does not say who; the feed never guesses a person's sex. */
+function pronounObj(e: FeedEvent) {
+  const sex = (e.data as { sex?: string }).sex;
+  return sex === "F" ? "her" : sex === "M" ? "him" : "them";
+}
 
 function weatherStory(d: Record<string, string | number | boolean | undefined>, place: React.ReactNode) {
   const at = place ? <> {place}</> : null;
@@ -122,6 +135,18 @@ export function describe(e: FeedEvent) {
       return <>{String(d.name)} grew into a town</>;
     case "became_city":
       return <>{String(d.name)} became a city</>;
+    case "friends":
+      return <>{a} and {o} became friends</>;
+    case "quarrel":
+      return <>{a} and {o} fell out over {String(d.about ?? "harsh words")}</>;
+    case "fight":
+      return <>{a} and {o} came to blows over {String(d.about ?? "an old grudge")}</>;
+    case "theft":
+      return <>Someone stole {String(d.stolen)} credits from {a}</>;
+    case "judged":
+      return <>{a} was caught stealing from {o}, and the {d.by === "law" ? "court" : "elders"} made {pronounObj(e)} give it back</>;
+    case "reconciled":
+      return <>{a} and {o} made peace</>;
     default:
       return <>{a} — {e.kind.replace(/_/g, " ")}</>;
   }

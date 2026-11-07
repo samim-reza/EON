@@ -196,6 +196,7 @@ export function GodConsole({ state }: { state: GodState }) {
           <Slider name="fertility_mult" label="Fertility" value={w.fertility_mult} min={0} max={5} step={0.05} hint="1 = natural" />
           <Slider name="mortality_mult" label="Mortality" value={w.mortality_mult} min={0.2} max={5} step={0.05} hint="redraws every fate" />
           <Slider name="disease_mult" label="Disease" value={w.disease_mult} min={0} max={5} step={0.05} hint="outbreaks & spread" />
+          <Slider name="crime_mult" label="Quarrels & crime" value={w.crime_mult} min={0} max={5} step={0.05} hint="1 = natural, 0 = perfect peace" />
           <Slider name="temp_shift" label="World temperature" value={w.temp_shift} min={-20} max={20} step={0.5} hint="°C added everywhere: 0 = natural" />
           <Slider name="rain_mult" label="Rainfall" value={w.rain_mult} min={0} max={4} step={0.05} hint="1 = natural, 0 = endless drought" />
           <Slider name="llm_cap" label="AI budget per day, $" value={w.llm_cap ?? 0.5} min={0} max={5} step={0.05} hint="0 turns the AI off" />

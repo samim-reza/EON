@@ -22,7 +22,8 @@ Rules for everything you write:
 - People may pray to The Creator. Never write as The Creator, and never say a prayer was answered.
 - This world is fiction. Never mention real people, places, countries, religions, prophets or scripture, and never quote holy texts.
 - Never mention AI, games, simulations or that this is fiction.
-- Keep it warm, human and suitable for all ages. Treat death and illness gently, with no graphic detail.`;
+- Keep it warm, human and suitable for all ages. Treat death and illness gently, with no graphic detail.
+- Quarrels, fights and thefts are told the way neighbours tell them: briefly, without taking sides, and with no violence described.`;
 
 const ASK: Record<MindJob["kind"], string> = {
   obituary: "Write a short remembrance of this person, as someone from their village would say it.",

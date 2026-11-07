@@ -20,6 +20,7 @@ const diseases = [
   ["Battery Rot", "slow corrosion of the power cells (robotic cancer)"],
   ["Memory Leak Syndrome", "memories drain away in old age (robotic dementia)"],
   ["Core Arrest", "the core stops without warning (robotic heart attack)"],
+  ["Wounds", "a fight that went too far; rare, but it happens"],
 ];
 
 export default function About() {
@@ -86,7 +87,10 @@ export default function About() {
       <h2 className="mt-10 text-xl font-semibold">Life and death</h2>
       <p className="mt-2 text-ink-2">
         Agents grow up, go to school, work as farmers, builders or healers, form partnerships and marry — never with
-        close kin. They have children who inherit a blend of their parents&apos; personalities. They fall ill:
+        close kin. They have children who inherit a blend of their parents&apos; personalities. They make friends, and
+        they fall out: over a stray goat, a borrowed tool, the edge of a field. Old grudges sometimes come to blows, and
+        the hungry sometimes steal. A small village sees everything, so most thieves are caught and made to give it back.
+        Grudges fade, people make peace, and some pray for it. They fall ill:
       </p>
       <div className="panel mt-3 divide-y divide-line/60">
         {diseases.map(([a, b]) => (

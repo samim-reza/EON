@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { describe } from "@/components/EventLine";
+import { FollowButton } from "@/components/FollowButton";
 import { LiveActivity, LiveAge, LiveDue } from "@/components/WorldClock";
 import { pub } from "@/lib/pub";
 import { formatAge, formatEonDate } from "@/shared/time";
@@ -102,9 +103,12 @@ export default async function AgentPage(props: PageProps<"/agents/[id]">) {
             </p>
           )}
         </div>
-        <Link href={`/family/${a.id}`} prefetch={false} className="btn btn-ghost">
-          Family tree
-        </Link>
+        <div className="flex gap-2">
+          <FollowButton id={a.id} name={`${a.name} ${a.surname}`} />
+          <Link href={`/family/${a.id}`} prefetch={false} className="btn btn-ghost">
+            Family tree
+          </Link>
+        </div>
       </div>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_1.5fr]">
