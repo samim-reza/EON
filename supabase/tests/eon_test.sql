@@ -2,7 +2,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = extensions, public;
 
-select plan(105);
+select plan(111);
 
 -- Tests never contain the real God email: point the lock at a throwaway address for this
 -- transaction only (everything below is rolled back).
@@ -362,6 +362,23 @@ insert into app.prayers (tick, agent_id, need) select w.tick, p.x, 'peace' from 
 select sim.answer_prayer((select max(id) from app.prayers), true, 'test', w.tick) from sim.world w;
 select is((select l.kind from sim.relationships l, pair p where l.a = p.x and l.b = p.y), 'friend', 'an answered prayer for peace ends the grudge'); -- 104
 select lives_ok($$select sim.p_community((select tick from sim.world))$$, 'the community pass runs');                                        -- 105
+
+------------------------------------------------------------------------------
+-- Hardening
+------------------------------------------------------------------------------
+insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, raw_user_meta_data, created_at, updated_at)
+values ('00000000-0000-0000-0000-000000000000', '44444444-4444-4444-4444-444444444444', 'authenticated', 'authenticated',
+        'pending@example.com', 'x', null, '{"username":"pending"}', now(), now());
+select is((select count(*)::int from app.profiles where user_id = '44444444-4444-4444-4444-444444444444'), 0,
+          'no username is taken before the address is confirmed');                                                                           -- 106
+update auth.users set email_confirmed_at = now() where id = '44444444-4444-4444-4444-444444444444';
+select is((select username from app.profiles where user_id = '44444444-4444-4444-4444-444444444444'), 'pending',
+          'confirming the address creates the profile');                                                                                      -- 107
+select is(api.signup_gate(repeat('a', 64), 'newname', 'new@example.com', repeat('b', 24)), 'ok', 'a fresh proof of work passes');            -- 108
+select is(api.signup_gate(repeat('a', 64), 'newname', 'new@example.com', repeat('b', 24)), 'replayed', 'the same proof of work is refused twice'); -- 109
+select lives_ok($$select api.login_gate(repeat('c', 64), 'who@example.com')$$, 'sign-in attempts are counted');                              -- 110
+select throws_ok($$select api.login_gate(repeat('c', 64), x || '@example.com') from generate_series(1, 25) x$$, 'P0429', null,
+                 'a network that keeps trying to sign in is cut off');                                                                        -- 111
 
 select * from finish();
 rollback;

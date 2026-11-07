@@ -12,7 +12,8 @@ const BATCH = 6;
 export async function POST(req: Request) {
   const secret = process.env.MINDS_SECRET;
   if (!secret || !process.env.ANTHROPIC_API_KEY) return problem(503, "not configured");
-  if (!verifyWake(req.headers.get("x-eon-sig"), secret, Date.now() / 1000)) return problem(401, "unauthorized");
+  // The database signs the moment it calls; 45 s covers clock drift and leaves little room for a replay.
+  if (!verifyWake(req.headers.get("x-eon-sig"), secret, Date.now() / 1000, 45)) return problem(401, "unauthorized");
 
   const db = adminClient();
   const { data, error } = await db.rpc("minds_claim", { p_limit: BATCH });

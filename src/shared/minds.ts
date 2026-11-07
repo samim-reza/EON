@@ -37,7 +37,9 @@ const ASK: Record<MindJob["kind"], string> = {
 
 export function promptFor(job: MindJob) {
   const age = typeof job.facts.age === "number" ? AGES[job.facts.age - 1] : undefined;
-  return `${ASK[job.kind]}\n\n<facts>${JSON.stringify({ ...job.facts, age })}</facts>`;
+  // Angle brackets are escaped so nothing inside the facts can close the tag that marks them as data.
+  const facts = JSON.stringify({ ...job.facts, age }).replace(/</g, "\\u003c").replace(/>/g, "\\u003e");
+  return `${ASK[job.kind]}\n\n<facts>${facts}</facts>`;
 }
 
 const FORBIDDEN = /\b(allah|muhammad|mohammed|prophet|quran|qur'an|koran|bible|torah|jesus|christ|moses|abraham|noah|hawwa|islam|muslim|christian|jewish|hindu|buddh\w*|simulation|chatbot|language model|as an ai)\b/i;

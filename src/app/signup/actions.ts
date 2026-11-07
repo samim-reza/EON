@@ -1,12 +1,12 @@
 "use server";
 
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { clientKey, powKey } from "@/lib/client-key";
 import { env } from "@/lib/env";
 import { checkSolution } from "@/lib/pow-check";
 import { rememberNav } from "@/lib/nav-session";
+import { siteUrl } from "@/lib/site";
 import { adminClient } from "@/lib/supabase/admin";
 import { createUserClient } from "@/lib/supabase/server";
 
@@ -46,13 +46,12 @@ const EMAIL_FAILED = "We couldn't create that account. If you already have one, 
  * Sends a confirmation link. Needs a custom SMTP provider: Supabase's built-in mail only reaches
  * members of the project's own team.
  */
-async function signUpWithEmail(h: Awaited<ReturnType<typeof headers>>, email: string, password: string, username: string): Promise<SignupState> {
+async function signUpWithEmail(email: string, password: string, username: string): Promise<SignupState> {
   const supabase = await createUserClient();
-  const origin = h.get("origin") ?? `https://${h.get("host")}`;
   const { error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { username }, emailRedirectTo: `${origin}/auth/confirm` },
+    options: { data: { username }, emailRedirectTo: `${siteUrl}/auth/confirm` }, // never built from request headers
   });
   // Same message for an existing address: never reveal who has an account.
   if (error) return fail(AUTH_ERRORS[error.code ?? ""] ?? EMAIL_FAILED);
@@ -82,17 +81,19 @@ export async function signUp(_prev: SignupState, form: FormData): Promise<Signup
   if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Check the form and try again.");
   const { username, email, password } = parsed.data;
 
-  const h = await headers();
   const client = await clientKey();
-  const work = checkSolution(powKey(), client, Object.fromEntries(form));
+  const fields = Object.fromEntries(form);
+  const work = checkSolution(powKey(), client, fields);
   if (work === "expired") return fail("This page has been open a while. Reload it and try again.");
   if (work !== "ok") return fail("Please wait a moment for the page to finish loading, then try again.");
-  const { data: gate, error: gateError } = await adminClient().rpc("signup_gate", { p_client: client, p_username: username, p_email: email });
+  // The salt goes along so the database can make sure each solved challenge is used only once.
+  const { data: gate, error: gateError } = await adminClient().rpc("signup_gate", { p_client: client, p_username: username, p_email: email, p_salt: String(fields.pow_salt ?? "") });
   if (gateError) return fail(gateError.code === "P0429" ? "Too many attempts from your network. Try again in an hour." : "Sign-up is unavailable right now.");
+  if (gate === "replayed") return fail("This page has been open a while. Reload it and try again.");
   if (gate !== "ok") return fail(GATE_ERRORS[gate] ?? "Check the form and try again.");
 
   const supabase = await createUserClient();
-  const created = env().SIGNUP_EMAIL_CONFIRMATION === "on" ? await signUpWithEmail(h, email, password, username) : await signUpInstantly(email, password, username);
+  const created = env().SIGNUP_EMAIL_CONFIRMATION === "on" ? await signUpWithEmail(email, password, username) : await signUpInstantly(email, password, username);
   if (created.error || created.sent) return created;
 
   const { data: me } = await supabase.rpc("whoami");
