@@ -359,7 +359,7 @@ select sim.reconcile(w.tick, p.x, p.y) from sim.world w, pair p;
 select is((select l.kind from sim.relationships l, pair p where l.a = p.x and l.b = p.y), 'friend', 'making peace turns a rival into a friend'); -- 103
 update sim.relationships set kind = 'rival', affinity = -60 from pair p where a = p.x and b = p.y;
 insert into app.prayers (tick, agent_id, need) select w.tick, p.x, 'peace' from sim.world w, pair p;
-select sim.answer_prayer((select max(id) from app.prayers), true, 'test', w.tick) from sim.world w;
+select sim.answer_prayer((select max(id) from app.prayers), true, 'autopilot', w.tick) from sim.world w;
 select is((select l.kind from sim.relationships l, pair p where l.a = p.x and l.b = p.y), 'friend', 'an answered prayer for peace ends the grudge'); -- 104
 select lives_ok($$select sim.p_community((select tick from sim.world))$$, 'the community pass runs');                                        -- 105
 

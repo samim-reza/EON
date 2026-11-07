@@ -233,6 +233,9 @@ begin
 end $$;
 
 -- People who carry a grudge pray for peace, and an answered prayer for peace makes it.
+alter table app.prayers drop constraint if exists prayers_need_check;
+alter table app.prayers add constraint prayers_need_check check (need in ('health', 'food', 'child', 'safety', 'peace'));
+
 create or replace function sim.p_prayers(p_tick integer) returns void
 language plpgsql security definer set search_path = '' as $$
 declare
