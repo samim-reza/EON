@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import { AuthNav } from "@/components/AuthNav";
 import { FramedLinks } from "@/components/FramedLinks";
+import { SiteAnalytics } from "@/components/SiteAnalytics";
 import { siteUrl } from "@/lib/site";
 import "./globals.css";
 
@@ -64,6 +65,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             Open source on GitHub
           </a>
         </footer>
+        <SiteAnalytics />
       </body>
     </html>
   );

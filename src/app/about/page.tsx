@@ -107,6 +107,12 @@ export default function About() {
         and request a life. The Creator decides who you will be born to and when. After birth your agent lives on its
         own; while you are online you make the big decisions, and when you are away your own AI acts as you.
       </p>
+
+      <h2 className="mt-10 text-xl font-semibold">Visitors</h2>
+      <p className="mt-2 text-ink-2">
+        Watching needs no account. Visits are counted anonymously (which pages, and which site sent you) with no
+        cookies and nothing that identifies you. The people you follow are kept only in your own browser.
+      </p>
     </div>
   );
 }
