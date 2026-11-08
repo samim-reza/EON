@@ -7,6 +7,13 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get("code");
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type");
+  // Password resets are not spent here: the link only opens the form, and the token is used on submit.
+  if (type === "recovery" && tokenHash) {
+    const next = new URL("/login/new-password", request.url);
+    next.searchParams.set("token", tokenHash);
+    return NextResponse.redirect(next, { status: 303 });
+  }
+
   const supabase = await createUserClient();
 
   let signedIn = false;

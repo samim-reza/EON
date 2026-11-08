@@ -22,7 +22,7 @@ export function SignupForm({ challenge }: { challenge: PowChallenge }) {
     return (
       <div className="text-sm">
         <h2 className="font-semibold text-birth">Check your email</h2>
-        <p className="mt-2 text-ink-2">We sent you a confirmation link. Open it to finish creating your account.</p>
+        <p className="mt-2 text-ink-2">We sent you a confirmation link. Open it to finish creating your account. If it isn’t in your inbox within a few minutes, look in your spam folder.</p>
       </div>
     );
   }

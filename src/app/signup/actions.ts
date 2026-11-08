@@ -7,6 +7,7 @@ import { env } from "@/lib/env";
 import { checkSolution } from "@/lib/pow-check";
 import { rememberNav } from "@/lib/nav-session";
 import { siteUrl } from "@/lib/site";
+import { passwordSchema } from "@/shared/password";
 import { adminClient } from "@/lib/supabase/admin";
 import { createUserClient } from "@/lib/supabase/server";
 
@@ -15,12 +16,7 @@ export type SignupState = { error: string | null; sent: boolean };
 const schema = z.object({
   username: z.string().trim().toLowerCase().regex(/^[a-z0-9_]{3,20}$/, "Usernames are 3–20 letters, digits or underscores."),
   email: z.email("Enter a valid email address.").max(254),
-  password: z
-    .string()
-    .min(12, "Passwords need at least 12 characters.")
-    .max(72, "Passwords can be at most 72 characters.")
-    .regex(/[a-zA-Z]/, "Passwords need at least one letter.")
-    .regex(/\d/, "Passwords need at least one digit."),
+  password: passwordSchema,
   age: z.literal("on", "You must be at least 13 to join."),
 });
 
