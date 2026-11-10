@@ -547,8 +547,10 @@ values ('00000000-0000-0000-0000-000000000000', '77777777-7777-7777-7777-7777777
 select set_config('request.jwt.claims', json_build_object('sub', '77777777-7777-7777-7777-777777777777', 'role', 'authenticated', 'aal', 'aal1')::text, true);
 set local role authenticated;
 select api.request_life();
-select ok((api.whoami() ->> 'agent') is not null
-          and (api.whoami() ->> 'agent')::bigint = (select agent_id from app.souls where user_id = '77777777-7777-7777-7777-777777777777'),
+reset role;
+select set_config('test.mine', (select agent_id::text from app.souls where user_id = '77777777-7777-7777-7777-777777777777'), true);
+set local role authenticated;
+select ok((api.whoami() ->> 'agent') is not null and (api.whoami() ->> 'agent') = current_setting('test.mine'),
           'a player can always find their own person');                                                                         -- 148
 select throws_ok('select api.god_player_agents()', '42501', 'Only God may do this', 'players cannot see where every player is'); -- 149
 reset role;
