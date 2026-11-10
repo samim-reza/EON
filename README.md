@@ -186,12 +186,16 @@ in time, whether or not The Creator is watching.
 | `/family/{id}` | three generations up, two down |
 | `/about` | how the world works |
 
-**Signing up** is open now, so you can reserve a name. **Playing (Milestone 2):** connect your own AI key and
-press **Request a life**. You are then given a role: a newborn girl or boy in a real family, with a birth time.
-After that your agent lives on its own. When you are online you get a few decision cards. When you are away,
-**your own AI** decides in character, and if it can't, the world decides for you.
+**Playing:** sign up and press **Request a life**. You are born as a baby into a real family, and from then on you
+are that person's soul. Once a year while they grow up, and at the big moments after (work, love, marriage, children,
+quarrels, temptation), you choose. Their **own mind**, an AI, thinks their thoughts, says their prayers and decides
+whatever you leave undecided for six hours; with no mind at all, habit decides. A choice is an intention, not an
+outcome: parents, partners, rivals and hunger pull the other way, and sometimes the person gives in. God can overrule
+any choice, or send a sign. You get an email when you are born.
 
-An AI key is required to play. A free one is enough. Supported providers:
+For the first three days of your first life, EON lends your person its own mind. After that you connect your own AI
+key, which is encrypted before it is stored and only ever used for your own person. A free one is enough. Without a
+key your person lives by habit and you can only watch. Supported providers:
 
 | Provider | Free tier |
 |---|---|
@@ -328,7 +332,8 @@ Copy `.env.example` to `.env.local`. Never commit real values.
 | `ANTHROPIC_API_KEY` | Claude key for the world's writing |
 | `ANTHROPIC_WORKSPACE_ID` | only with an organization-wide key: the workspace to bill |
 | `MINDS_SECRET` | signs the database's request to wake the AI worker |
-| `BYOK_KEK` | 32-byte master key that encrypts player AI keys (M2) |
+| `BYOK_KEK` | 32 random bytes, base64: the master key that encrypts player AI keys. It never goes to the database |
+| `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` | SMTP relay for the "you are born" emails (the same one Supabase Auth uses). Optional |
 
 ## Testing
 
@@ -359,7 +364,7 @@ close-kin union ever happens, and the population settles near the land's capacit
 
 - [x] **M0 Foundation:** Supabase, Next.js 16, security headers, CI
 - [x] **M1 Genesis:** world engine (clock, fate, fertility, kinship, disease, Genesis founders), live map, feed, chronicle, profiles, family trees
-- [ ] **M2 Players:** ~~sign-up~~ (done), captcha, bring-your-own AI key (six providers), request a life, decision cards
+- [x] **M2 Players:** sign-up with email confirmation, request a life, life choices with outside influence, own AI key (six providers), birth emails
 - [x] **M3 Minds:** AI-written diaries, prayers, obituaries and news, with a hard daily budget
 - [ ] **M4 Towns:** markets, schools, hospitals and doctors, police, thieves, bribery, migration
 - [ ] **M5 Nations:** cities, countries, governance, calamities

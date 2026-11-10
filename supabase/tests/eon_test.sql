@@ -2,7 +2,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = extensions, public;
 
-select plan(111);
+select plan(137);
 
 -- Tests never contain the real God email: point the lock at a throwaway address for this
 -- transaction only (everything below is rolled back).
@@ -379,6 +379,118 @@ select is(api.signup_gate(repeat('a', 64), 'newname', 'new@example.com', repeat(
 select lives_ok($$select api.login_gate(repeat('c', 64), 'who@example.com')$$, 'sign-in attempts are counted');                              -- 110
 select throws_ok($$select api.login_gate(repeat('c', 64), x || '@example.com') from generate_series(1, 25) x$$, 'P0429', null,
                  'a network that keeps trying to sign in is cut off');                                                                        -- 111
+
+------------------------------------------------------------------------------
+-- Free will
+------------------------------------------------------------------------------
+select set_config('test.soul', (select id::text from app.souls where status = 'living' order by id limit 1), true);
+select set_config('test.player', (select agent_id::text from app.souls where status = 'living' order by id limit 1), true);
+select ok((select o.trial_until = o.born_tick + 3 * 1440 from app.souls o where o.id = current_setting('test.soul')::bigint),
+          'a first life starts with three days of EON''s own mind');                                                            -- 112
+select is((select count(*)::int from app.outbox x where x.soul_id = current_setting('test.soul')::bigint and x.kind = 'born'), 1,
+          'the player is told they are born');                                                                                  -- 113
+select is(app.soul_mind(current_setting('test.soul')::bigint, (select tick from sim.world)), 'world', 'EON thinks for them at first'); -- 114
+
+-- A year of childhood is theirs to choose.
+update sim.agents set birth_tick = (select tick - 1440 - 200 from sim.world) where id = current_setting('test.player')::bigint;
+select sim.p_growing(w.tick - w.tick % 120 + a.bucket) from sim.world w, sim.agents a where a.id = current_setting('test.player')::bigint;
+select set_config('test.year', (select max(id)::text from app.choices where agent_id = current_setting('test.player')::bigint and kind = 'year'), true);
+select ok((select options @> '[{"id": "mother"}]' from app.choices where id = current_setting('test.year')::bigint),
+          'a toddler is asked how to spend the year');                                                                         -- 115
+
+select set_config('request.jwt.claims', json_build_object('sub', '33333333-3333-3333-3333-333333333333', 'role', 'authenticated', 'aal', 'aal1')::text, true);
+set local role authenticated;
+select throws_ok($$select api.choose(current_setting('test.year')::bigint, 'mother')$$, '42501', 'That choice is not yours',
+                 'nobody chooses for someone else''s soul');                                                                    -- 116
+reset role;
+select set_config('request.jwt.claims', json_build_object('sub', '22222222-2222-2222-2222-222222222222', 'role', 'authenticated', 'aal', 'aal1')::text, true);
+set local role authenticated;
+select throws_ok($$select api.choose(current_setting('test.year')::bigint, 'fly')$$, 'P0001', 'That is not one of the options',
+                 'only an offered option can be chosen');                                                                      -- 117
+select lives_ok($$select api.choose(current_setting('test.year')::bigint, 'mother')$$, 'the player chooses');                -- 118
+select is((api.my_life() -> 'choices' -> 0 ->> 'by'), 'player', 'the player sees their own choice');                         -- 119
+reset role;
+select sim.p_choices((select tick from sim.world));
+select is((select outcome ->> 'did' from app.choices where id = current_setting('test.year')::bigint), 'mother', 'what the player chose happens'); -- 120
+
+-- When the player is away, their own mind is asked; when it has nothing usable to say, habit decides.
+insert into app.choices (soul_id, agent_id, kind, tick, due_tick, options, habit)
+select current_setting('test.soul')::bigint, current_setting('test.player')::bigint, 'year', w.tick, w.tick - 1,
+       '[{"id": "mother", "label": "Stay close"}, {"id": "fire", "label": "Sit by the fire"}]', 'fire' from sim.world w;
+select set_config('test.late', (select max(id)::text from app.choices), true);
+select sim.p_choices((select tick from sim.world));
+select is((select status from app.choices where id = current_setting('test.late')::bigint), 'asked', 'when the player is away, the mind is asked'); -- 121
+select ok(exists (select 1 from llm.jobs where kind = 'mind_choice' and choice_id = current_setting('test.late')::bigint), 'the question goes to the mind'); -- 122
+update sim.world set llm_cap = 0.5;
+update llm.jobs set status = 'done' where status = 'queued' and choice_id is distinct from current_setting('test.late')::bigint;
+select set_config('test.claim', api.minds_claim(5)::text, true);
+select is((current_setting('test.claim')::jsonb -> 0 -> 'mind' ->> 'source'), 'world', 'during the free days it is EON''s mind'); -- 123
+select ok((current_setting('test.claim')::jsonb -> 0 -> 'facts' -> 'choice') is not null, 'the mind is shown the choice');   -- 124
+select api.minds_finish_soul((select id from llm.jobs where choice_id = current_setting('test.late')::bigint), 'jump', 'I want to fly.', null, 100, 20, null);
+select is((select status from app.choices where id = current_setting('test.late')::bigint), 'asked', 'an option that was not offered is ignored'); -- 125
+update app.choices set due_tick = (select tick - 1 from sim.world) where id = current_setting('test.late')::bigint;
+select sim.p_choices((select tick from sim.world));
+select is((select chosen_by from app.choices where id = current_setting('test.late')::bigint), 'habit', 'then habit decides'); -- 126
+
+insert into app.choices (soul_id, agent_id, kind, tick, due_tick, options, habit)
+select current_setting('test.soul')::bigint, current_setting('test.player')::bigint, 'year', w.tick, w.tick - 1,
+       '[{"id": "mother", "label": "Stay close"}, {"id": "fire", "label": "Sit by the fire"}]', 'mother' from sim.world w;
+select set_config('test.mind', (select max(id)::text from app.choices), true);
+select sim.p_choices((select tick from sim.world));
+update llm.jobs set status = 'done' where status = 'queued' and choice_id is distinct from current_setting('test.mind')::bigint;
+select api.minds_claim(5);
+select api.minds_finish_soul((select id from llm.jobs where choice_id = current_setting('test.mind')::bigint), 'fire', 'The fire is warm and bright.', null, 100, 20, null);
+select is((select chosen_by from app.choices where id = current_setting('test.mind')::bigint), 'mind', 'the mind''s own choice is kept'); -- 127
+
+-- God can overrule.
+insert into app.choices (soul_id, agent_id, kind, tick, due_tick, options, habit)
+select current_setting('test.soul')::bigint, current_setting('test.player')::bigint, 'year', w.tick, w.tick + 300,
+       '[{"id": "mother", "label": "Stay close"}, {"id": "fire", "label": "Sit by the fire"}]', 'mother' from sim.world w;
+select set_config('test.open', (select max(id)::text from app.choices), true);
+select set_config('request.jwt.claims', json_build_object('sub', '11111111-1111-1111-1111-111111111111', 'role', 'authenticated',
+  'aal', 'aal2', 'amr', json_build_array(json_build_object('method', 'totp', 'timestamp', extract(epoch from now())::bigint)))::text, true);
+set local role authenticated;
+select lives_ok($$select api.god_choose(current_setting('test.open')::bigint, 'fire')$$, 'God can overrule any choice');    -- 128
+reset role;
+select is((select chosen_by from app.choices where id = current_setting('test.open')::bigint), 'god', 'and God''s will is done'); -- 129
+
+-- After the free days, without a key of their own, the player can only watch.
+update app.souls set trial_until = (select tick from sim.world) where id = current_setting('test.soul')::bigint;
+select is(app.soul_mind(current_setting('test.soul')::bigint, (select tick from sim.world)), 'none', 'after the free days, no key means no mind'); -- 130
+insert into app.choices (soul_id, agent_id, kind, tick, due_tick, options, habit)
+select current_setting('test.soul')::bigint, current_setting('test.player')::bigint, 'year', w.tick, w.tick + 300,
+       '[{"id": "mother", "label": "Stay close"}, {"id": "fire", "label": "Sit by the fire"}]', 'mother' from sim.world w;
+select set_config('test.watch', (select max(id)::text from app.choices), true);
+select set_config('request.jwt.claims', json_build_object('sub', '22222222-2222-2222-2222-222222222222', 'role', 'authenticated', 'aal', 'aal1')::text, true);
+set local role authenticated;
+select throws_ok($$select api.choose(current_setting('test.watch')::bigint, 'fire')$$, 'P0001', 'Connect your own AI to make choices again',
+                 'without a mind, the player can only watch');                                                                 -- 131
+reset role;
+insert into secrets.ai_keys (user_id, provider, model, ciphertext, iv, tag, last4)
+values ('22222222-2222-2222-2222-222222222222', 'groq', 'openai/gpt-oss-20b', 'sealed', 'iv', 'tag', 'abcd');
+select is(app.soul_mind(current_setting('test.soul')::bigint, (select tick from sim.world)), 'own', 'their own key brings the mind back'); -- 132
+set local role authenticated;
+select throws_ok($$select api.key_save('22222222-2222-2222-2222-222222222222', 'groq', 'm', 'c', 'i', 't', 1::smallint, 'abcd')$$, '42501', null,
+                 'players cannot write keys directly');                                                                       -- 133
+reset role;
+
+-- A second life needs your own AI once the free days are used.
+insert into app.souls (user_id, status, requested_tick, trial_until, ended_tick) values ('33333333-3333-3333-3333-333333333333', 'ended', 0, 100, 0);
+select set_config('request.jwt.claims', json_build_object('sub', '33333333-3333-3333-3333-333333333333', 'role', 'authenticated', 'aal', 'aal1')::text, true);
+set local role authenticated;
+select throws_ok('select api.request_life()', 'P0001', 'Your free days are used: connect your own AI to ask for another life',
+                 'after the free days, a new life needs your own AI');                                                         -- 134
+reset role;
+
+-- A quarrel happens to you; what you do about it is yours.
+select sim.answer_back((select tick from sim.world), current_setting('test.player')::bigint,
+                       (select a.id from sim.agents a where a.id <> current_setting('test.player')::bigint order by a.id limit 1), 'a stray goat');
+select ok(exists (select 1 from app.choices where agent_id = current_setting('test.player')::bigint and kind = 'quarrel' and status = 'open'),
+          'after a quarrel, what happens next is up to them');                                                                  -- 135
+select is((api.outbox_claim(5) -> 0 ->> 'kind'), 'born', 'the worker picks up the birth email');                              -- 136
+set local role authenticated;
+select throws_ok('select api.outbox_claim(1)', '42501', null, 'players cannot read the email queue');                         -- 137
+reset role;
 
 select * from finish();
 rollback;

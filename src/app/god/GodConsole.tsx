@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useActionState, useTransition } from "react";
 import { formatEonDate } from "@/shared/time";
 import { BIOME_NAMES, type Biome } from "@/shared/climate";
-import { answerPrayer, assignSoul, changePassword, createFounder, foundSettlement, genesis, heal, moveAgent, possess, release, setPaused, setWorld, smite, type ActionResult } from "./actions";
+import { answerPrayer, assignSoul, changePassword, createFounder, foundSettlement, genesis, heal, moveAgent, overrule, possess, release, sendSign, setPaused, setWorld, smite, type ActionResult } from "./actions";
 
 export type GodState = {
   world: {
@@ -20,7 +20,13 @@ export type GodState = {
   settlements: { id: number; name: string; kind: string; pop: number }[];
   /** The best free land first. */
   sites?: { id: number; x: number; y: number; biome: Biome | null; river: number; coast: boolean }[];
-  prayers?: { id: number; need: string; tick: number; agent: string; agentId: number; place: string | null }[];
+  prayers?: { id: number; need: string; tick: number; words?: string | null; agent: string; agentId: number; place: string | null }[];
+  /** Players' people, their minds, and the choices still open to them. */
+  lives?: {
+    id: number; username: string; agentId: number; name: string; age: number; mind: "world" | "own" | "none";
+    trialUntil: number | null; key: string | null; thought: string | null;
+    pending: { id: number; kind: string; options: { id: string; label: string }[]; status: string; choice: string | null; by: string | null; about: string | null }[];
+  }[];
   souls?: { id: number; tick: number; username: string }[];
   families?: { id: number; due: number; mother: string; place: string | null }[];
   possessed?: { id: number; name: string; until: number }[];
@@ -116,6 +122,8 @@ export function GodConsole({ state }: { state: GodState }) {
   const [placed, placeAction, placing] = useActionState(assignSoul, init);
   const [taken, possessAction, taking] = useActionState(possess, init);
   const [freed, releaseAction] = useActionState(release, init);
+  const [overruled, overruleAction, overruling] = useActionState(overrule, init);
+  const [signed, signAction, signing] = useActionState(sendSign, init);
   const [pausing, startPause] = useTransition();
 
   if (!w.genesis_at)
@@ -291,7 +299,10 @@ export function GodConsole({ state }: { state: GodState }) {
           <ul className="max-h-80 divide-y divide-line/60 overflow-auto text-sm">
             {(state.prayers ?? []).map((p) => (
               <li key={p.id} className="flex items-center justify-between gap-2 py-2">
-                <span className="text-ink-2"><span className="text-ink">{p.agent}</span> asks for {p.need}</span>
+                <span className="text-ink-2">
+                  <span className="text-ink">{p.agent}</span> asks for {p.need}
+                  {p.words ? <span className="block italic">&ldquo;{p.words}&rdquo;</span> : null}
+                </span>
                 <form action={answerAction} className="flex shrink-0 gap-1">
                   <input type="hidden" name="prayer" value={p.id} />
                   <button name="answer" value="grant" className="btn btn-god" disabled={answering}>Grant</button>
@@ -349,6 +360,53 @@ export function GodConsole({ state }: { state: GodState }) {
             </div>
           )}
         </div>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="panel space-y-3 p-5 lg:col-span-2">
+          <h2 className="font-semibold">Souls living their lives</h2>
+          <p className="text-xs text-ink-3">
+            Players&apos; people. Their choices are their own, but you can overrule any of them before it happens.
+          </p>
+          <Result s={overruled} />
+          {(state.lives ?? []).length === 0 && <p className="text-sm text-ink-3">No player is alive yet.</p>}
+          <ul className="max-h-[28rem] divide-y divide-line/60 overflow-auto text-sm">
+            {(state.lives ?? []).map((l) => (
+              <li key={l.id} className="py-3">
+                <div className="flex flex-wrap items-baseline gap-2">
+                  <Link href={`/agents/${l.agentId}`} prefetch={false} className="text-ink hover:underline">{l.name}</Link>
+                  <span className="text-ink-3">#{l.agentId} · {l.age} y · {l.username}</span>
+                  <span className="tag">
+                    {l.mind === "world" ? `EON's mind until ${l.trialUntil != null ? formatEonDate(l.trialUntil) : "soon"}`
+                      : l.mind === "own" ? `own AI · ${l.key ?? ""}` : "watching only"}
+                  </span>
+                </div>
+                {l.thought && <p className="mt-1 italic text-ink-2">&ldquo;{l.thought}&rdquo;</p>}
+                {l.pending.map((c) => (
+                  <form key={c.id} action={overruleAction} className="mt-2 flex flex-wrap items-center gap-1">
+                    <input type="hidden" name="choice" value={c.id} />
+                    <span className="text-ink-2">
+                      {c.kind}{c.about ? ` (${c.about})` : ""}{c.choice ? ` · ${c.by} chose ${c.choice}` : ""}:
+                    </span>
+                    {c.options.map((o) => (
+                      <button key={o.id} name="option" value={o.id} className="btn btn-ghost text-xs" disabled={overruling}>{o.label}</button>
+                    ))}
+                  </form>
+                ))}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <form action={signAction} className="panel space-y-3 p-5">
+          <h2 className="font-semibold">Send a sign</h2>
+          <p className="text-xs text-ink-3">
+            A dream or a feeling. A player&apos;s person sees it and decides whether to heed it; anyone else follows their faith.
+          </p>
+          <input name="agent" type="number" min={1} placeholder="Agent id" className="input" />
+          <input name="text" placeholder="What they dream" className="input" maxLength={200} />
+          <Result s={signed} />
+          <button className="btn btn-god w-full" disabled={signing}>Send the sign</button>
+        </form>
       </div>
 
       <div className="panel p-5">

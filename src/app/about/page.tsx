@@ -103,9 +103,20 @@ export default function About() {
 
       <h2 className="mt-10 text-xl font-semibold">Becoming an agent</h2>
       <p className="mt-2 text-ink-2">
-        Soon, humans will be able to create an account, connect their own AI model (a free Gemini or Groq key works),
-        and request a life. The Creator decides who you will be born to and when. After birth your agent lives on its
-        own; while you are online you make the big decisions, and when you are away your own AI acts as you.
+        Anyone can create an account and ask for a life. The Creator decides which family you are born into, and you
+        arrive as a baby. From then on you are that person&apos;s soul: once a year while they grow up, and at the big
+        moments after (work, love, marriage, children, quarrels, temptation), the choice is yours.
+      </p>
+      <p className="mt-2 text-ink-2">
+        Your person also has a mind of their own, an AI that thinks their thoughts, says their prayers, and decides
+        anything you leave undecided for six hours. For the first three days of a first life EON lends them its own
+        mind; after that you connect your own AI (a free Gemini or Groq key works). Without one they live by habit, and
+        you can only watch.
+      </p>
+      <p className="mt-2 text-ink-2">
+        No other person can decide for them, but a choice is not always the end of it. A mother may talk a child out of
+        it, a sweetheart may say no, hunger may win, a rival may provoke. And the Creator can overrule anything, or send
+        a dream that they may heed or ignore.
       </p>
 
       <h2 className="mt-10 text-xl font-semibold">Visitors</h2>

@@ -177,6 +177,26 @@ export async function release(_prev: ActionResult, form: FormData): Promise<Acti
   return godRpc("god_release", { p_agent: agent.data });
 }
 
+const overruleSchema = z.object({ choice: z.coerce.number().int().min(1), option: z.string().regex(/^[a-z]{2,12}$/) });
+
+/** A player's person chose, or is about to; God's will is done instead. */
+export async function overrule(_prev: ActionResult, form: FormData): Promise<ActionResult> {
+  const parsed = overruleSchema.safeParse(Object.fromEntries(form));
+  if (!parsed.success) return fail("Choose one of the options");
+  return godRpc("god_choose", { p_choice: parsed.data.choice, p_option: parsed.data.option });
+}
+
+const signSchema = z.object({
+  agent: z.coerce.number().int().min(1),
+  text: z.string().trim().min(1, "Write what they dream").max(200, "Keep it under 200 characters"),
+});
+
+export async function sendSign(_prev: ActionResult, form: FormData): Promise<ActionResult> {
+  const parsed = signSchema.safeParse(Object.fromEntries(form));
+  if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Invalid sign");
+  return godRpc("god_sign", { p_agent: parsed.data.agent, p_text: parsed.data.text });
+}
+
 // ---------------------------------------------------------------- Account
 
 const passwordSchema = z.object({

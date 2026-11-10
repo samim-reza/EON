@@ -29,13 +29,15 @@ const COLORS: Record<string, string> = {
   theft: "text-sick",
   judged: "text-god",
   reconciled: "text-love",
+  work: "text-life",
+  sign: "text-god",
 };
 
 const ICONS: Record<string, string> = {
   birth: "✦", death: "✝", union: "♥", wedding: "◈", pregnant: "◌", diagnosis: "⚕", outbreak: "☣",
   genesis: "☀", founders_arrive: "☀", founder_created: "☀", miracle_heal: "✧", founded: "⌂", became_town: "⌂", became_city: "⌂",
   weather: "☁", harvest: "❧", discovery: "✺", built: "⌂", moved: "→", prayer: "☾", prayer_answered: "✧", spoke: "❝", voice: "✎",
-  friends: "♡", quarrel: "✕", fight: "⚔", theft: "⊘", judged: "⚖", reconciled: "✽",
+  friends: "♡", quarrel: "✕", fight: "⚔", theft: "⊘", judged: "⚖", reconciled: "✽", work: "⚒", sign: "✧",
 };
 
 function A({ id, name }: { id: number | null; name: string | null }) {
@@ -147,6 +149,10 @@ export function describe(e: FeedEvent) {
       return <>{a} was caught stealing from {o}, and the {d.by === "law" ? "court" : "elders"} made {pronounObj(e)} give it back</>;
     case "reconciled":
       return <>{a} and {o} made peace</>;
+    case "work":
+      return <>{a} took up work as a {String(d.work)}</>;
+    case "sign":
+      return <>{a} had a dream they could not forget</>;
     default:
       return <>{a} — {e.kind.replace(/_/g, " ")}</>;
   }
