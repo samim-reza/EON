@@ -13,6 +13,8 @@ export type Life = {
   status?: "waiting" | "assigned" | "living" | "ended"; agent?: number | null; dueTick?: number | null;
   mother?: string | null; father?: string | null; place?: string | null; name?: string | null;
   mind?: "world" | "own" | "none"; trialUntil?: number | null; bornTick?: number | null;
-  person?: Person; choices?: Choice[]; thoughts?: { tick: number; kind: string; body: string }[];
+  person?: Person; choices?: Choice[]; thoughts?: { tick: number; kind: string; body: string; question?: string }[];
+  deeds?: { id: string; label: string; other?: number }[]; deedsLeft?: number; asksLeft?: number; asking?: boolean;
+  done?: { tick: number; kind: string; told: string }[];
   prayers?: { tick: number; need: string; words?: string; status: string }[]; happened?: FeedEvent[];
 };

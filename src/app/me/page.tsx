@@ -12,6 +12,8 @@ import { ChoiceCard } from "./ChoiceCard";
 import { ConnectAI } from "./ConnectAI";
 import { PrayForm } from "./PrayForm";
 import { RequestLife } from "./RequestLife";
+import { Today } from "./Today";
+import { QUESTIONS } from "@/shared/soul-mind";
 import type { Life } from "./types";
 
 export const metadata: Metadata = { title: "My life", robots: { index: false } };
@@ -128,6 +130,12 @@ function Living({ life }: { life: Life }) {
         </div>
       </section>
 
+      {life.mind !== "none" ? (
+        <Today name={name} deeds={life.deeds ?? []} left={life.deedsLeft ?? 0} asksLeft={life.asksLeft ?? 0} asking={Boolean(life.asking)} />
+      ) : (
+        <p className="mt-8 text-sm text-sick">Connect your AI below to act and talk with {name} again.</p>
+      )}
+
       <section className="mt-8">
         <h2 className="text-lg font-semibold">Choices</h2>
         {open.length === 0 ? (
@@ -141,6 +149,20 @@ function Living({ life }: { life: Life }) {
           </div>
         )}
       </section>
+
+      {(life.done ?? []).length > 0 && (
+        <section className="mt-8">
+          <h2 className="text-lg font-semibold">What you did lately</h2>
+          <ul className="mt-2 space-y-1 text-sm">
+            {life.done!.map((d, i) => (
+              <li key={i} className="flex gap-3">
+                <span className="w-24 shrink-0 font-mono text-[11px] text-ink-3">{formatEonDate(d.tick)}</span>
+                <span className="text-ink-2">{d.told}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {decided.length > 0 && (
         <section className="mt-8">
@@ -165,7 +187,10 @@ function Living({ life }: { life: Life }) {
             {life.thoughts!.map((t, i) => (
               <li key={i} className="flex gap-3">
                 <span className="w-24 shrink-0 font-mono text-[11px] text-ink-3">{formatEonDate(t.tick)}</span>
-                <span className="italic text-ink-2">{t.body}</span>
+                <span className="text-ink-2">
+                  {t.question && <span className="block text-xs text-ink-3">You asked: {QUESTIONS[t.question]}</span>}
+                  <span className="italic">{t.body}</span>
+                </span>
               </li>
             ))}
           </ul>

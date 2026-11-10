@@ -81,3 +81,26 @@ export async function removeKey(): Promise<void> {
   await supabase.rpc("key_delete");
   revalidatePath("/me");
 }
+
+export type DeedState = { error: string | null; told?: string };
+
+export async function doDeed(_prev: DeedState, form: FormData): Promise<DeedState> {
+  const deed = String(form.get("deed") ?? "");
+  const otherRaw = form.get("other");
+  const other = otherRaw ? Number(otherRaw) : null;
+  if (!/^[a-z]{3,12}$/.test(deed) || (other !== null && (!Number.isSafeInteger(other) || other <= 0))) return { error: "You cannot do that right now." };
+  const supabase = await createUserClient();
+  const { data, error } = await supabase.rpc("do_deed", { p_deed: deed, p_other: other });
+  if (error) return { error: say(error) };
+  revalidatePath("/me");
+  return { error: null, told: String(data ?? "") };
+}
+
+export async function askMind(_prev: LifeState, form: FormData): Promise<LifeState> {
+  const question = String(form.get("question") ?? "");
+  const supabase = await createUserClient();
+  const { error } = await supabase.rpc("ask_mind", { p_question: question });
+  if (error) return { error: say(error) };
+  revalidatePath("/me");
+  return { error: null };
+}

@@ -2,7 +2,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = extensions, public;
 
-select plan(153);
+select plan(158);
 
 -- Tests never contain the real God email: point the lock at a throwaway address for this
 -- transaction only (everything below is rolled back).
@@ -576,6 +576,22 @@ select ok((select w.tick - a.birth_tick = 0 and a.mother_id is not null and a.fa
              from app.souls o join sim.agents a on a.id = o.agent_id, sim.world w where o.user_id = '88888888-8888-8888-8888-888888888888'),
           'as the newborn of a family that has just arrived');                                                                 -- 152
 select is(sim.arrivals_today((select tick from sim.world)), 1, 'and the arrival is counted against the daily limit');      -- 153
+
+-- Things to do, and questions to ask.
+select ok(exists (select 1 from jsonb_array_elements(sim.deeds_for((select agent_id from app.souls where user_id = '88888888-8888-8888-8888-888888888888'),
+                                                                   (select tick from sim.world))) e where e ->> 'id' = 'sleep'),
+          'a newborn has things to do too');                                                                                  -- 154
+select set_config('request.jwt.claims', json_build_object('sub', '88888888-8888-8888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal1')::text, true);
+set local role authenticated;
+select is(api.do_deed('sleep'), 'You slept deeply and woke up hungry.', 'a deed happens at once');                       -- 155
+select api.do_deed('sleep'); select api.do_deed('sleep'); select api.do_deed('sleep');
+select throws_ok($$select api.do_deed('sleep')$$, 'P0001', 'That is enough for one day. Come back tomorrow.', 'four deeds a day'); -- 156
+select lives_ok($$select api.ask_mind('feel')$$, 'a player can ask their person how they feel');                        -- 157
+reset role;
+update llm.jobs set status = 'done' where status = 'queued' and kind <> 'mind_ask';
+select api.minds_claim(5);
+select api.minds_finish_soul((select id from llm.jobs where kind = 'mind_ask' order by id desc limit 1), null, 'Warm. Full. Sleepy.', null, 50, 10, null);
+select is((select question from app.thoughts where kind = 'answer' order by id desc limit 1), 'feel', 'and their own mind answers'); -- 158
 
 select * from finish();
 rollback;

@@ -7,7 +7,7 @@
  */
 import { cleanVoice } from "./minds";
 
-export type SoulJobKind = "mind_choice" | "mind_day" | "mind_prayer";
+export type SoulJobKind = "mind_choice" | "mind_day" | "mind_prayer" | "mind_ask";
 type Facts = Record<string, unknown>;
 type Option = { id: string; label: string };
 
@@ -57,6 +57,14 @@ export function temperament(me: Facts): string[] {
   return words;
 }
 
+/** The only things a player can ask: fixed, so no player's words ever reach a model. */
+export const QUESTIONS: Record<string, string> = {
+  feel: "How are you feeling today?",
+  want: "What do you want most in your life right now?",
+  family: "What do you think of your family?",
+  creator: "Do you believe in the Creator?",
+};
+
 const NEEDS: Record<string, string> = {
   health: "health", food: "food for your family", child: "a child", safety: "safety from the weather",
   peace: "peace with a neighbour", thanks: "nothing: you want to give thanks",
@@ -104,6 +112,7 @@ export function lifeOf(facts: Facts) {
     },
     happened: facts.happened,
     decided: facts.decided,
+    "you did lately": facts.did,
     lately: facts.lately,
     need: typeof facts.need === "string" ? NEEDS[facts.need] : undefined,
     known: facts.known,
@@ -127,6 +136,12 @@ export function soulPrompt(kind: SoulJobKind, facts: Facts): string {
   if (kind === "mind_choice") {
     ask = `You must decide: see "choice". Pick exactly one of its option ids. Then say in one sentence, at most 25 words, what you think or feel about it. ${voice}
 Reply only with JSON: {"choice": "<one option id>", "thought": "..."}`;
+  } else if (kind === "mind_ask") {
+    const q = QUESTIONS[String(facts.question)] ?? QUESTIONS.feel;
+    ask = baby
+      ? `Someone who loves you leans close and asks: "${q}" ${voice}\nReply only with JSON: {"thought": "..."}`
+      : `Someone close to your heart asks you: "${q}" Answer honestly as yourself, in the first person: one or two sentences, at most 30 words. ${voice}
+Reply only with JSON: {"thought": "..."}`;
   } else if (kind === "mind_prayer") {
     const need = obj(facts.prayer).need;
     ask = `You have decided to pray to the Creator for ${NEEDS[String(need)] ?? "what you need"}. Write your prayer in your own words: one or two sentences, at most 30 words. ${voice}

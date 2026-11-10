@@ -32,13 +32,14 @@ const COLORS: Record<string, string> = {
   work: "text-life",
   sign: "text-god",
   family_arrives: "text-birth",
+  deed: "text-ink-2",
 };
 
 const ICONS: Record<string, string> = {
   birth: "✦", death: "✝", union: "♥", wedding: "◈", pregnant: "◌", diagnosis: "⚕", outbreak: "☣",
   genesis: "☀", founders_arrive: "☀", founder_created: "☀", miracle_heal: "✧", founded: "⌂", became_town: "⌂", became_city: "⌂",
   weather: "☁", harvest: "❧", discovery: "✺", built: "⌂", moved: "→", prayer: "☾", prayer_answered: "✧", spoke: "❝", voice: "✎",
-  friends: "♡", quarrel: "✕", fight: "⚔", theft: "⊘", judged: "⚖", reconciled: "✽", work: "⚒", sign: "✧", family_arrives: "⌂",
+  friends: "♡", quarrel: "✕", fight: "⚔", theft: "⊘", judged: "⚖", reconciled: "✽", work: "⚒", sign: "✧", family_arrives: "⌂", deed: "·",
 };
 
 function A({ id, name }: { id: number | null; name: string | null }) {
@@ -154,6 +155,17 @@ export function describe(e: FeedEvent) {
       return <>{a} took up work as a {String(d.work)}</>;
     case "sign":
       return <>{a} had a dream they could not forget</>;
+    case "deed": {
+      const did: Record<string, React.ReactNode> = {
+        cuddle: <>{o} held {a} close</>, smile: <>{a} smiled at {o}</>, sleep: <>{a} slept soundly</>,
+        play: <>{a} and {o} played together</>, chores: <>{a} helped {o} with the chores</>,
+        explore: <>{a} went exploring</>, stories: <>{a} listened to the elders&apos; stories</>,
+        work: <>{a} worked extra hard</>, rest: <>{a} rested</>, visit: <>{a} visited {o}</>,
+        help: <>{a} helped {o}</>, teach: <>{a} taught {o}</>, peace: <>{a} went to {o} to make peace</>,
+        love: <>{a} went looking for love</>, give: <>{a} gave to someone in need</>,
+      };
+      return did[String(d.deed)] ?? <>{a} did something</>;
+    }
     case "family_arrives":
       return <>A new family came to {place ?? "the village"}: {a} and {o}, with their newborn</>;
     default:
