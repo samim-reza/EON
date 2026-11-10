@@ -26,11 +26,11 @@ function Waiting({ life }: { life: Life }) {
   if (life.status === "waiting") {
     return (
       <p className="mt-2 text-ink-2">
-        Your soul is waiting for a family.{" "}
+        Your soul is waiting for a family. The moment a child under three has no soul, you become them.{" "}
         {life.expecting > 0
-          ? `${life.expecting} ${life.expecting === 1 ? "family is" : "families are"} expecting a child right now. A waiting soul is given one about six hours after asking.`
-          : "Nobody in EON is expecting a child right now, so you will be given the next baby on the way."}{" "}
-        You will get an email the moment you are born.
+          ? `Otherwise, ${life.expecting} ${life.expecting === 1 ? "family is" : "families are"} expecting a child right now, and a waiting soul is given one about six hours after asking.`
+          : "Otherwise you will be given the next baby on the way."}{" "}
+        You will get an email the moment your life begins.
       </p>
     );
   }
@@ -206,11 +206,11 @@ export default async function MePage() {
           <p className="mt-2 text-ink-2">
             {status === "ended"
               ? `${life.name ?? "Your last life"} has ended. You can ask for another.`
-              : "Ask for a life, and you will be born into EON as a newborn in a real family."}
+              : "Ask for a life. If a child under three in EON has no soul yet, you become them at once; otherwise you are born as the next baby."}
           </p>
           <p className="mt-2 text-sm text-ink-3">
             {life.freeDays
-              ? "For the first three days of your first life, EON gives your person a mind of its own. After that, they need your own AI."
+              ? "For the first three days of your first life, counted from when it begins, EON gives your person a mind of its own. After that, they need your own AI."
               : life.key
                 ? "Your person will think with your own AI."
                 : "Your free days are used. Connect your own AI below, then ask."}

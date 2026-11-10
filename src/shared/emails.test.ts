@@ -9,6 +9,14 @@ describe("emails", () => {
     expect(e.text).toContain("https://eon.example/me");
   });
 
+  it("says so when the soul was given a young child rather than a newborn", () => {
+    const e = bornEmail({ name: "Kai Voss", mother: "Lyra Voss", father: "Orin Kell", place: "Elysium", ageTicks: 1440 + 360 }, "https://eon.example");
+    expect(e.subject).toBe("You have a life: Kai Voss");
+    expect(e.text).toContain("Kai Voss, a child 1 year old in Elysium, the child of Lyra Voss and Orin Kell.");
+    expect(bornEmail({ name: "Ada", ageTicks: 30 }, "https://x").subject).toBe("You are born: Ada");
+    expect(bornEmail({ name: "Ada", ageTicks: 600 }, "https://x").text).toContain("a child 5 months old");
+  });
+
   it("escapes names in the HTML version", () => {
     expect(trialOverEmail({ name: "<b>Kai</b>" }, "https://eon.example").html).not.toContain("<b>Kai</b>");
   });

@@ -150,12 +150,16 @@ export async function answerPrayer(_prev: ActionResult, form: FormData): Promise
   return godRpc("god_answer_prayer", { p_prayer: parsed.data.prayer, p_grant: parsed.data.answer === "grant" });
 }
 
-const soulSchema = z.object({ soul: z.coerce.number().int().min(1), family: z.coerce.number().int().min(1) });
+const soulSchema = z.object({ soul: z.coerce.number().int().min(1), family: z.string().regex(/^[pc]\d{1,12}$/) });
 
+/** A family's coming baby ("p" and the pregnancy) or a young child already alive ("c" and the person). */
 export async function assignSoul(_prev: ActionResult, form: FormData): Promise<ActionResult> {
   const parsed = soulSchema.safeParse(Object.fromEntries(form));
   if (!parsed.success) return fail("Choose a soul and a family");
-  return godRpc("god_assign_soul", { p_soul: parsed.data.soul, p_pregnancy: parsed.data.family });
+  const id = Number(parsed.data.family.slice(1));
+  return parsed.data.family.startsWith("c")
+    ? godRpc("god_give_child", { p_soul: parsed.data.soul, p_agent: id })
+    : godRpc("god_assign_soul", { p_soul: parsed.data.soul, p_pregnancy: id });
 }
 
 const possessSchema = z.object({

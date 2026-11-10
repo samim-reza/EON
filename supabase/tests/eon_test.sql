@@ -2,7 +2,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = extensions, public;
 
-select plan(137);
+select plan(141);
 
 -- Tests never contain the real God email: point the lock at a throwaway address for this
 -- transaction only (everything below is rolled back).
@@ -491,6 +491,25 @@ select is((api.outbox_claim(5) -> 0 ->> 'kind'), 'born', 'the worker picks up th
 set local role authenticated;
 select throws_ok('select api.outbox_claim(1)', '42501', null, 'players cannot read the email queue');                         -- 137
 reset role;
+
+-- A young child with no soul takes a new player's soul at once, and the free days start then.
+insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, raw_user_meta_data, created_at, updated_at)
+values ('00000000-0000-0000-0000-000000000000', '66666666-6666-6666-6666-666666666666', 'authenticated', 'authenticated',
+        'newcomer@example.com', 'x', now(), '{"username":"newcomer"}', now(), now());
+update sim.agents set birth_tick = (select tick - 700 from sim.world)
+ where id = (select a.id from sim.agents a where a.soul_id is null and a.controller = 'auto' order by a.id desc limit 1);
+select set_config('request.jwt.claims', json_build_object('sub', '66666666-6666-6666-6666-666666666666', 'role', 'authenticated', 'aal', 'aal1')::text, true);
+set local role authenticated;
+select is((api.request_life() ->> 'status'), 'living', 'a new player becomes a young child with no soul at once');               -- 138
+reset role;
+select ok((select a.soul_id = o.id and a.controller = 'soul' and (select tick from sim.world) - a.birth_tick < 3 * 1440
+             from app.souls o join sim.agents a on a.id = o.agent_id where o.user_id = '66666666-6666-6666-6666-666666666666'),
+          'the child is theirs now');                                                                                          -- 139
+select ok((select o.born_tick = w.tick and o.trial_until = w.tick + 3 * 1440
+             from app.souls o, sim.world w where o.user_id = '66666666-6666-6666-6666-666666666666'),
+          'their three free days start from that moment');                                                                     -- 140
+select is((select count(*)::int from app.outbox x join app.souls o on o.id = x.soul_id
+            where o.user_id = '66666666-6666-6666-6666-666666666666' and x.kind = 'born'), 1, 'and they get the welcome email'); -- 141
 
 select * from finish();
 rollback;

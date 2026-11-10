@@ -29,6 +29,8 @@ export type GodState = {
   }[];
   souls?: { id: number; tick: number; username: string }[];
   families?: { id: number; due: number; mother: string; place: string | null }[];
+  /** Children under three who have no soul yet: a waiting soul can become one of them at once. */
+  children?: { id: number; name: string; months: number; place: string | null }[];
   possessed?: { id: number; name: string; until: number }[];
   ai?: { spent: number; lines: number; cap: number; waiting: number };
   pyramid: { band: number; F: number; M: number }[];
@@ -314,19 +316,24 @@ export function GodConsole({ state }: { state: GodState }) {
         </div>
         <form action={placeAction} className="panel space-y-3 p-5">
           <h2 className="font-semibold">Souls waiting for a life</h2>
-          <p className="text-xs text-ink-3">After 6 hours a soul joins the family whose baby is due soonest.</p>
+          <p className="text-xs text-ink-3">A soul becomes a child under three with no soul at once; if there is none, after 6 hours it joins the baby due soonest.</p>
           <select name="soul" className="input">
             {(state.souls ?? []).map((s) => (
               <option key={s.id} value={s.id}>{s.username}</option>
             ))}
           </select>
           <select name="family" className="input">
+            {(state.children ?? []).map((c) => (
+              <option key={`c${c.id}`} value={`c${c.id}`}>
+                {c.name}, {c.months < 12 ? `${c.months} months` : `${Math.floor(c.months / 12)} years`}{c.place ? `, ${c.place}` : ""} (now)
+              </option>
+            ))}
             {(state.families ?? []).map((f) => (
-              <option key={f.id} value={f.id}>{f.mother}&apos;s baby, {formatEonDate(f.due)}{f.place ? `, ${f.place}` : ""}</option>
+              <option key={`p${f.id}`} value={`p${f.id}`}>{f.mother}&apos;s baby, {formatEonDate(f.due)}{f.place ? `, ${f.place}` : ""}</option>
             ))}
           </select>
           <Result s={placed} />
-          <button className="btn btn-god w-full" disabled={placing || !state.souls?.length || !state.families?.length}>Give this life</button>
+          <button className="btn btn-god w-full" disabled={placing || !state.souls?.length || !(state.families?.length || state.children?.length)}>Give this life</button>
         </form>
         <div className="space-y-3">
           <form action={possessAction} className="panel space-y-3 p-5">
