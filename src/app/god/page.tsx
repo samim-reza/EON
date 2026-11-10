@@ -29,12 +29,14 @@ export default async function GodPage() {
   if (aal?.currentLevel !== "aal2") {
     body = <MfaGate factorId={verified?.id ?? null} />;
   } else {
-    const [{ data, error }, { data: children }] = await Promise.all([supabase.rpc("god_state"), supabase.rpc("god_children")]);
+    const [{ data, error }, { data: children }, { data: players }] = await Promise.all([
+      supabase.rpc("god_state"), supabase.rpc("god_children"), supabase.rpc("god_players"),
+    ]);
     body = error ? (
       // Typically: MFA older than 12 h — verify again.
       <MfaGate factorId={verified?.id ?? null} />
     ) : (
-      <GodConsole state={{ ...(data as GodState), children: (children ?? []) as GodState["children"] }} />
+      <GodConsole state={{ ...(data as GodState), children: (children ?? []) as GodState["children"], players: (players ?? []) as GodState["players"] }} />
     );
   }
 

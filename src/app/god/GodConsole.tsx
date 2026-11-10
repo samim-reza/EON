@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useActionState, useTransition } from "react";
 import { formatEonDate } from "@/shared/time";
 import { BIOME_NAMES, type Biome } from "@/shared/climate";
-import { answerPrayer, assignSoul, changePassword, createFounder, foundSettlement, genesis, heal, moveAgent, overrule, possess, release, sendSign, setPaused, setWorld, smite, type ActionResult } from "./actions";
+import { answerPrayer, assignSoul, changePassword, createFounder, findPeople, foundSettlement, genesis, heal, moveAgent, overrule, playerAction, possess, release, sendSign, setPaused, setWorld, smite, type ActionResult } from "./actions";
 
 export type GodState = {
   world: {
@@ -32,6 +32,12 @@ export type GodState = {
   /** Children under three who have no soul yet: a waiting soul can become one of them at once. */
   children?: { id: number; name: string; months: number; place: string | null }[];
   possessed?: { id: number; name: string; until: number }[];
+  /** Every player account, newest first. */
+  players?: {
+    userId: string; username: string; joined: string; lastSeen: string | null; confirmed: boolean; lives: number;
+    soul: number | null; status: "waiting" | "assigned" | "living" | "ended" | null; trialUntil: number | null; agent: number | null;
+    mind: "world" | "own" | "none" | null; person: string | null; age: number | null; place: string | null; key: string | null;
+  }[];
   ai?: { spent: number; lines: number; cap: number; waiting: number };
   pyramid: { band: number; F: number; M: number }[];
   dbBytes: number;
@@ -39,6 +45,21 @@ export type GodState = {
 };
 
 const init: ActionResult = { ok: false, error: null };
+
+type Found = { id: number; name: string; sex: "F" | "M"; age: number; work: string; place: string | null; health: number; controller: string; player: string | null };
+
+const day = (iso: string | null) => (iso ? new Date(iso).toISOString().slice(0, 10) : "never");
+
+/** Destructive buttons ask first. Preventing the submit also stops the action. */
+function confirmDanger(event: React.FormEvent<HTMLFormElement>) {
+  const op = ((event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null)?.value;
+  const ask: Record<string, string> = {
+    take: "Take this soul out of its life? The person lives on without them.",
+    remove: "Remove this player's account for good? Their person lives on without them.",
+    smite: "Take this life? It cannot be undone.",
+  };
+  if (op && ask[op] && !window.confirm(ask[op])) event.preventDefault();
+}
 
 function Result({ s }: { s: ActionResult }) {
   if (s.error) return <p className="text-sm text-death">{s.error}</p>;
@@ -126,6 +147,8 @@ export function GodConsole({ state }: { state: GodState }) {
   const [freed, releaseAction] = useActionState(release, init);
   const [overruled, overruleAction, overruling] = useActionState(overrule, init);
   const [signed, signAction, signing] = useActionState(sendSign, init);
+  const [played, playAction, playing] = useActionState(playerAction, init);
+  const [found, findAction, finding] = useActionState(findPeople, init);
   const [pausing, startPause] = useTransition();
 
   if (!w.genesis_at)
@@ -414,6 +437,91 @@ export function GodConsole({ state }: { state: GodState }) {
           <Result s={signed} />
           <button className="btn btn-god w-full" disabled={signing}>Send the sign</button>
         </form>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="panel space-y-3 p-5">
+          <h2 className="font-semibold">Players</h2>
+          <p className="text-xs text-ink-3">Every account, newest first. Everything you do here is recorded in the audit log.</p>
+          <Result s={played} />
+          {(state.players ?? []).length === 0 && <p className="text-sm text-ink-3">No players yet.</p>}
+          <ul className="max-h-[32rem] divide-y divide-line/60 overflow-auto text-sm">
+            {(state.players ?? []).map((p) => (
+              <li key={p.userId} className="py-3">
+                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                  <span className="font-medium text-ink">{p.username}</span>
+                  <span className="text-xs text-ink-3">
+                    joined {day(p.joined)} · last seen {day(p.lastSeen)} · {p.lives} {p.lives === 1 ? "life" : "lives"}
+                    {p.confirmed ? "" : " · email not confirmed"}
+                  </span>
+                </div>
+                <p className="mt-1 text-ink-2">
+                  {p.status === "living" && p.agent ? (
+                    <>Lives as <Link href={`/agents/${p.agent}`} prefetch={false} className="text-ink hover:underline">{p.person}</Link> (#{p.agent}), {p.age}{p.place ? `, ${p.place}` : ""}</>
+                  ) : p.status === "waiting" ? "Waiting for a life"
+                    : p.status === "assigned" ? "Waiting to be born"
+                      : p.status === "ended" ? `Last life ended${p.person ? `: ${p.person}` : ""}` : "Has not asked for a life"}
+                </p>
+                {p.status === "living" && (
+                  <p className="text-xs text-ink-3">
+                    {p.mind === "world" ? `EON's mind until ${p.trialUntil != null ? formatEonDate(p.trialUntil) : "soon"}`
+                      : p.mind === "own" ? `Own AI: ${p.key ?? ""}` : "No mind: watching only"}
+                    {p.key && p.mind !== "own" ? ` · key ${p.key}` : ""}
+                  </p>
+                )}
+                <form action={playAction} onSubmit={confirmDanger} className="mt-2 flex flex-wrap gap-1">
+                  <input type="hidden" name="user" value={p.userId} />
+                  {p.soul != null && <input type="hidden" name="soul" value={p.soul} />}
+                  {p.status === "living" && <button name="op" value="extend" className="btn btn-ghost text-xs" disabled={playing}>+3 free days</button>}
+                  {p.status && p.status !== "ended" && <button name="op" value="take" className="btn btn-ghost text-xs" disabled={playing}>Take back the soul</button>}
+                  {p.key && <button name="op" value="revoke" className="btn btn-ghost text-xs" disabled={playing}>Revoke key</button>}
+                  <button name="op" value="remove" className="btn btn-ghost text-xs text-death" disabled={playing}>Remove player</button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="panel space-y-3 p-5">
+          <h2 className="font-semibold">Find anyone</h2>
+          <p className="text-xs text-ink-3">By name or id. Players&apos; people come first. Leave it empty to list the oldest.</p>
+          <form action={findAction} className="flex gap-2">
+            <input name="q" placeholder="Name or id" className="input" maxLength={60} />
+            <button className="btn btn-god" disabled={finding}>Find</button>
+          </form>
+          {found.error && <p className="text-sm text-death">{found.error}</p>}
+          <Result s={healed} />
+          <Result s={smitten} />
+          <ul className="max-h-[28rem] divide-y divide-line/60 overflow-auto text-sm">
+            {((found.data as Found[] | undefined) ?? []).map((a) => (
+              <li key={a.id} className="py-2">
+                <div className="flex flex-wrap items-baseline gap-x-2">
+                  <Link href={`/agents/${a.id}`} prefetch={false} className="text-ink hover:underline">#{a.id} {a.name}</Link>
+                  <span className="text-xs text-ink-3">
+                    {a.sex === "F" ? "♀" : "♂"} {a.age} · {a.work} · {a.place ?? "?"} · health {a.health}
+                    {a.player ? ` · soul of ${a.player}` : ""}{a.controller === "god" ? " · possessed" : ""}
+                  </span>
+                </div>
+                <div className="mt-1 flex flex-wrap items-center gap-1">
+                  <form action={healAction}>
+                    <input type="hidden" name="agent" value={a.id} />
+                    <button className="btn btn-ghost text-xs" disabled={healing}>Heal</button>
+                  </form>
+                  <form action={signAction} className="flex gap-1">
+                    <input type="hidden" name="agent" value={a.id} />
+                    <input name="text" placeholder="Send a dream" className="input h-7 w-40 text-xs" maxLength={200} />
+                    <button className="btn btn-ghost text-xs" disabled={signing}>Send</button>
+                  </form>
+                  <form action={smiteAction} onSubmit={confirmDanger}>
+                    <input type="hidden" name="agent" value={a.id} />
+                    <input type="hidden" name="cause" value="Divine Will" />
+                    <button value="smite" className="btn btn-ghost text-xs text-death" disabled={smiting}>Take this life</button>
+                  </form>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
 
       <div className="panel p-5">

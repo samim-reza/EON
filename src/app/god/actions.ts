@@ -201,6 +201,37 @@ export async function sendSign(_prev: ActionResult, form: FormData): Promise<Act
   return godRpc("god_sign", { p_agent: parsed.data.agent, p_text: parsed.data.text });
 }
 
+// ---------------------------------------------------------------- Players and people
+
+const playerSchema = z.object({
+  op: z.enum(["extend", "take", "revoke", "remove"]),
+  user: z.uuid(),
+  soul: z.coerce.number().int().min(1).optional(),
+});
+
+/** One form per player; the button pressed says what to do. */
+export async function playerAction(_prev: ActionResult, form: FormData): Promise<ActionResult> {
+  const parsed = playerSchema.safeParse(Object.fromEntries(form));
+  if (!parsed.success) return fail("Invalid player action");
+  const { op, user, soul } = parsed.data;
+  if ((op === "extend" || op === "take") && !soul) return fail("That player has no life");
+  switch (op) {
+    case "extend": return godRpc("god_extend_free", { p_soul: soul, p_days: 3 });
+    case "take": return godRpc("god_take_soul", { p_soul: soul });
+    case "revoke": return godRpc("god_revoke_key", { p_user: user });
+    case "remove": return godRpc("god_remove_player", { p_user: user });
+  }
+}
+
+export async function findPeople(_prev: ActionResult, form: FormData): Promise<ActionResult> {
+  const q = z.string().trim().max(60).safeParse(form.get("q") ?? "");
+  if (!q.success) return fail("Search for up to 60 characters");
+  const supabase = await createUserClient();
+  const { data, error } = await supabase.rpc("god_find", { p_query: q.data });
+  if (error) return fail(error.message);
+  return { ok: true, error: null, data };
+}
+
 // ---------------------------------------------------------------- Account
 
 const passwordSchema = z.object({

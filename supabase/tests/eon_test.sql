@@ -2,7 +2,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = extensions, public;
 
-select plan(141);
+select plan(147);
 
 -- Tests never contain the real God email: point the lock at a throwaway address for this
 -- transaction only (everything below is rolled back).
@@ -510,6 +510,35 @@ select ok((select o.born_tick = w.tick and o.trial_until = w.tick + 3 * 1440
           'their three free days start from that moment');                                                                     -- 140
 select is((select count(*)::int from app.outbox x join app.souls o on o.id = x.soul_id
             where o.user_id = '66666666-6666-6666-6666-666666666666' and x.kind = 'born'), 1, 'and they get the welcome email'); -- 141
+
+-- The Creator keeps every player and every person in hand.
+set local role authenticated;
+select throws_ok('select api.god_players()', '42501', 'Only God may do this', 'players cannot list players');              -- 142
+reset role;
+select set_config('request.jwt.claims', json_build_object('sub', '11111111-1111-1111-1111-111111111111', 'role', 'authenticated',
+  'aal', 'aal2', 'amr', json_build_array(json_build_object('method', 'totp', 'timestamp', extract(epoch from now())::bigint)))::text, true);
+select set_config('test.newsoul', (select id::text from app.souls where user_id = '66666666-6666-6666-6666-666666666666'), true);
+select set_config('test.t0', (select trial_until::text from app.souls where user_id = '66666666-6666-6666-6666-666666666666'), true);
+set local role authenticated;
+select ok((select count(*) > 0 from jsonb_array_elements(api.god_players()) e where e ->> 'username' = 'newcomer'), 'God sees every player'); -- 143
+select api.god_extend_free(current_setting('test.newsoul')::bigint, 3);
+reset role;
+select is((select trial_until - current_setting('test.t0')::int from app.souls where id = current_setting('test.newsoul')::bigint), 3 * 1440,
+          'God can give more free days');                                                                                     -- 144
+select set_config('test.body', (select agent_id::text from app.souls where id = current_setting('test.newsoul')::bigint), true);
+set local role authenticated;
+select api.god_take_soul(current_setting('test.newsoul')::bigint);
+reset role;
+select ok((select o.status = 'ended' and a.soul_id is null and a.controller = 'auto'
+             from app.souls o, sim.agents a where o.id = current_setting('test.newsoul')::bigint and a.id = current_setting('test.body')::bigint),
+          'God can take a soul back, and the person lives on');                                                               -- 145
+select set_config('test.p1', (select agent_id::text from app.souls where status = 'living' order by id limit 1), true);
+delete from auth.users where id = '22222222-2222-2222-2222-222222222222';
+select ok((select a.soul_id is null and a.controller = 'auto' from sim.agents a where a.id = current_setting('test.p1')::bigint),
+          'when a player is removed, their person lives on as an ordinary life');                                            -- 146
+set local role authenticated;
+select ok((select count(*) > 0 from jsonb_array_elements(api.god_find('')) e), 'God can find anyone');                     -- 147
+reset role;
 
 select * from finish();
 rollback;
