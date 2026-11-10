@@ -230,7 +230,7 @@ export default async function MePage() {
           <p className="mt-2 text-ink-2">
             {status === "ended"
               ? `${life.name ?? "Your last life"} has ended. You can ask for another.`
-              : "Ask for a life. If a child under three in EON has no soul yet, you become them at once; otherwise you are born as the next baby."}
+              : "Ask for a life. You start at once: as a child under three who has no soul yet, or as the newborn of a family just arriving in a village."}
           </p>
           <p className="mt-2 text-sm text-ink-3">
             {life.freeDays

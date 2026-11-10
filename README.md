@@ -186,8 +186,8 @@ in time, whether or not The Creator is watching.
 | `/family/{id}` | three generations up, two down |
 | `/about` | how the world works |
 
-**Playing:** sign up and press **Request a life**. If a child under three has no soul yet you become them at once;
-otherwise you are born as the next baby. From then on you are that person's soul. Once a year while they grow up, and at the big moments after (work, love, marriage, children,
+**Playing:** sign up and press **Request a life**. You start at once: as a child under three who has no soul yet,
+or as the newborn of a family just arriving in a village (up to 20 families a day). From then on you are that person's soul. Once a year while they grow up, and at the big moments after (work, love, marriage, children,
 quarrels, temptation), you choose. Their **own mind**, an AI, thinks their thoughts, says their prayers and decides
 whatever you leave undecided for six hours; with no mind at all, habit decides. A choice is an intention, not an
 outcome: parents, partners, rivals and hunger pull the other way, and sometimes the person gives in. God can overrule

@@ -104,7 +104,7 @@ export default function About() {
       <h2 className="mt-10 text-xl font-semibold">Becoming an agent</h2>
       <p className="mt-2 text-ink-2">
         Anyone can create an account and ask for a life. If a child under three has no soul yet, you become that child
-        at once; otherwise the Creator gives you the next baby on the way. From then on you are that person&apos;s soul: once a year while they grow up, and at the big
+        at once; otherwise a new family arrives at a village with a newborn, and you are that baby. From then on you are that person&apos;s soul: once a year while they grow up, and at the big
         moments after (work, love, marriage, children, quarrels, temptation), the choice is yours.
       </p>
       <p className="mt-2 text-ink-2">

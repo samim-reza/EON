@@ -2,7 +2,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = extensions, public;
 
-select plan(150);
+select plan(153);
 
 -- Tests never contain the real God email: point the lock at a throwaway address for this
 -- transaction only (everything below is rolled back).
@@ -559,6 +559,20 @@ select set_config('request.jwt.claims', json_build_object('sub', '11111111-1111-
 set local role authenticated;
 select ok(exists (select 1 from jsonb_array_elements(api.god_player_agents()) e where e ->> 'username' = 'finder'), 'God sees every player''s person'); -- 150
 reset role;
+
+-- When no young child is free, a family arrives with a newborn, and the soul becomes that baby at once.
+update sim.agents a set birth_tick = birth_tick - 4 * 1440 from sim.world w where a.soul_id is null and w.tick - a.birth_tick < 3 * 1440;
+insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, raw_user_meta_data, created_at, updated_at)
+values ('00000000-0000-0000-0000-000000000000', '88888888-8888-8888-8888-888888888888', 'authenticated', 'authenticated',
+        'arrival@example.com', 'x', now(), '{"username":"arrival"}', now(), now());
+select set_config('request.jwt.claims', json_build_object('sub', '88888888-8888-8888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal1')::text, true);
+set local role authenticated;
+select is((api.request_life() ->> 'status'), 'living', 'with no young child free, a soul still begins its life at once');  -- 151
+reset role;
+select ok((select w.tick - a.birth_tick = 0 and a.mother_id is not null and a.father_id is not null
+             from app.souls o join sim.agents a on a.id = o.agent_id, sim.world w where o.user_id = '88888888-8888-8888-8888-888888888888'),
+          'as the newborn of a family that has just arrived');                                                                 -- 152
+select is(sim.arrivals_today((select tick from sim.world)), 1, 'and the arrival is counted against the daily limit');      -- 153
 
 select * from finish();
 rollback;
