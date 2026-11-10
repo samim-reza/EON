@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { describe } from "@/components/EventLine";
 import { FollowButton } from "@/components/FollowButton";
+import { PersonTools } from "@/components/PersonTools";
 import { LiveActivity, LiveAge, LiveDue } from "@/components/WorldClock";
 import { pub } from "@/lib/pub";
 import { formatAge, formatEonDate } from "@/shared/time";
@@ -103,13 +104,19 @@ export default async function AgentPage(props: PageProps<"/agents/[id]">) {
             </p>
           )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <FollowButton id={a.id} name={`${a.name} ${a.surname}`} />
+          {a.alive && (
+            <Link href={`/world?agent=${a.id}`} prefetch={false} className="btn btn-ghost">
+              On the map
+            </Link>
+          )}
           <Link href={`/family/${a.id}`} prefetch={false} className="btn btn-ghost">
             Family tree
           </Link>
         </div>
       </div>
+      <PersonTools id={a.id} name={`${a.name} ${a.surname}`} alive={a.alive} />
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_1.5fr]">
         <div className="space-y-6">

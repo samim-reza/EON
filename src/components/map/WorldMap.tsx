@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LiveFeed } from "@/components/LiveFeed";
+import { useMe } from "@/components/me";
 import { RightNow } from "@/components/RightNow";
 import { LiveActivity, LiveAge, WorldClock } from "@/components/WorldClock";
 import { climateOf } from "@/components/local-climate";
@@ -159,6 +160,13 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
   const glow = useRef<HTMLCanvasElement | null>(null);
   const placed = useRef(false);
   const onScreen = useRef(true);
+  const me = useMe();
+  /** The draw loop reads who "you" are from here, so learning it does not restart the loop. */
+  const meRef = useRef(me);
+  useEffect(() => {
+    meRef.current = me;
+  }, [me]);
+  const [note, setNote] = useState<string | null>(null);
 
   // --- data -------------------------------------------------------------------
   const requestedVersion = useRef<number>(-1);
@@ -494,6 +502,8 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
       // agents
       const r = Math.max(1.4, Math.min(5, c.z * 0.6));
       const labels: { x: number; y: number; name: string; d: number }[] = [];
+      const meNow = meRef.current;
+      const marks: { x: number; y: number; you: boolean; name: string }[] = [];
       for (const g of groups) {
         const gx = sx(g.x);
         const gy = sy(g.y);
@@ -504,6 +514,8 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
           const x = sx(p.x);
           const y = sy(p.y);
           if (x < -5 || y < -5 || x > W + 5 || y > H + 5) continue;
+          if (a.id === meNow.agent) marks.push({ x, y, you: true, name: "You" });
+          else if (meNow.players.has(a.id)) marks.push({ x, y, you: false, name: meNow.players.get(a.id)! });
           const stage = lifeStage((tf - a.birth) / 1440);
           if (c.z >= FIGURES_FROM_ZOOM && p.plan && p.weather && !p.plan.asleep && stage !== "baby") {
             const size = Math.min(11, Math.max(4.6, c.z * 0.56)) * (stage === "child" ? 0.78 : 1);
@@ -534,6 +546,26 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
           }
           ctx.globalAlpha = 1;
           if (hero) labels.push({ x, y, name: a.name, d: (x - focusX) ** 2 + (y - focusY) ** 2 });
+        }
+      }
+
+      // You, always: a beating gold ring and your name for yourself. God sees every player by name.
+      if (marks.length) {
+        ctx.textAlign = "center";
+        for (const m of marks) {
+          const beat = m.you && !reducedMotion ? Math.sin(ts / 380) * 2.5 : 0;
+          ctx.beginPath();
+          ctx.arc(m.x, m.y, (m.you ? 11 : 8) + beat, 0, Math.PI * 2);
+          ctx.strokeStyle = m.you ? "#f5b84b" : "rgba(255, 255, 255, 0.85)";
+          ctx.lineWidth = m.you ? 2.5 : 1.5;
+          ctx.stroke();
+          ctx.font = m.you ? "700 12px var(--font-geist-sans), system-ui" : "600 11px var(--font-geist-sans), system-ui";
+          ctx.lineJoin = "round";
+          ctx.strokeStyle = "rgba(8, 14, 26, 0.75)";
+          ctx.lineWidth = 3;
+          ctx.strokeText(m.name, m.x, m.y - 17);
+          ctx.fillStyle = m.you ? "#f5b84b" : "#ffffff";
+          ctx.fillText(m.name, m.x, m.y - 17);
         }
       }
 
@@ -696,6 +728,36 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
     }
   };
 
+  const focusOn = useCallback((a: Agent) => {
+    setSelected(a);
+    setFollow(true);
+    cam.current.z = Math.max(cam.current.z, 9);
+    setNote(null);
+  }, []);
+  const myPerson = me.agent != null ? agents.find((a) => a.id === me.agent) ?? null : null;
+
+  // Links can point at someone: /world?agent=42, or /world?find=me for your own person.
+  const linked = useRef(false);
+  useEffect(() => {
+    if (linked.current || hero || agents.length === 0) return;
+    const params = new URLSearchParams(window.location.search);
+    const find = params.get("find");
+    const id = Number(params.get("agent"));
+    if (find === "me" && !me.known) return; // still finding out who you are
+    linked.current = true;
+    // The address is outside React: act on it once, just after this render.
+    queueMicrotask(() => {
+      if (find === "me") {
+        if (myPerson) focusOn(myPerson);
+        else setNote(me.signedIn ? "You do not have a life yet. Ask for one on My life." : "Sign in to find yourself.");
+      } else if (Number.isSafeInteger(id) && id > 0) {
+        const a = agents.find((x) => x.id === id);
+        if (a) focusOn(a);
+        else setNote("That person is no longer alive.");
+      }
+    });
+  }, [agents, hero, me, myPerson, focusOn]);
+
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (q.length < 2) return [];
@@ -747,6 +809,12 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
             <span className="text-ink-3">Connecting to EON…</span>
           )}
         </div>
+        {myPerson && (
+          <button className="btn btn-god pointer-events-auto w-44 justify-center sm:w-64" onClick={() => focusOn(myPerson)}>
+            Find me · {myPerson.name.split(" ")[0]}
+          </button>
+        )}
+        {note && <div className="panel pointer-events-auto w-44 px-3 py-2 text-xs text-ink-2 sm:w-64">{note}</div>}
         <div className="pointer-events-auto w-44 sm:w-64">
           <input
             className="input"
@@ -762,9 +830,7 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
                   <button
                     className="w-full px-3 py-1.5 text-left hover:bg-bg-2"
                     onClick={() => {
-                      setSelected(a);
-                      setFollow(true);
-                      cam.current.z = Math.max(cam.current.z, 8);
+                      focusOn(a);
                       setQuery("");
                     }}
                   >
@@ -792,13 +858,20 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
         <span><span className="text-sick">○</span> sick</span>
         <span><span className="text-god">○</span> founder</span>
         <span>○ human soul</span>
+        {myPerson && <span className="text-god">◎ you</span>}
       </div>
 
       {selected && (
         <div className="panel absolute bottom-3 right-3 w-72 p-4 text-sm">
           <div className="flex items-start justify-between gap-2">
             <div>
-              <div className="font-semibold">{selected.name}</div>
+              <div className="font-semibold">
+                {selected.name}
+                {selected.id === me.agent && <span className="ml-1 text-god">(you)</span>}
+              </div>
+              {me.players.has(selected.id) && selected.id !== me.agent && (
+                <div className="text-xs text-god">soul of {me.players.get(selected.id)}</div>
+              )}
               <div className="text-ink-2">
                 <LiveAge birthTick={selected.birth} /> · {selected.job} · {settlementById.get(selected.settlement)?.name}
               </div>
@@ -822,9 +895,15 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
             <button className={`btn ${follow ? "btn-god" : "btn-ghost"} flex-1`} onClick={() => setFollow((f) => !f)}>
               {follow ? "Following" : "Follow"}
             </button>
-            <Link href={`/agents/${selected.id}`} className="btn btn-life flex-1">
-              Life story
-            </Link>
+            {selected.id === me.agent ? (
+              <Link href="/me" className="btn btn-life flex-1">
+                My life
+              </Link>
+            ) : (
+              <Link href={`/agents/${selected.id}`} className="btn btn-life flex-1">
+                Life story
+              </Link>
+            )}
           </div>
         </div>
       )}

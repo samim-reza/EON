@@ -40,6 +40,11 @@ export function AuthNav() {
   if (user) {
     return (
       <div className="ml-auto flex items-center gap-3 text-sm">
+        {!user.isGod && (
+          <Link href="/world?find=me" prefetch={false} className="text-god hover:underline" title="Show me on the map">
+            ◎ Find me
+          </Link>
+        )}
         <Link href={user.isGod ? "/god" : "/me"} prefetch={false} className={`font-medium hover:underline ${user.isGod ? "text-god" : "text-ink"}`}>
           {user.username}
         </Link>

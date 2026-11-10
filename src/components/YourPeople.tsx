@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import type { AgentDetail, FeedEvent } from "@/shared/types";
 import { EventLine } from "./EventLine";
 import { toggleFollow, useFollowing } from "./follow";
+import { useMe } from "./me";
 import { LiveActivity, LiveAge } from "./WorldClock";
 
 /**
@@ -12,7 +13,11 @@ import { LiveActivity, LiveAge } from "./WorldClock";
  * them. Shown only once someone is followed, so the front page stays clean for a first visit.
  */
 export function YourPeople() {
-  const following = useFollowing();
+  const followed = useFollowing();
+  const me = useMe();
+  // A player's own person comes first, always.
+  const following = followed === null ? null
+    : me.agent != null ? [{ id: me.agent, name: "You" }, ...followed.filter((p) => p.id !== me.agent)] : followed;
   const [people, setPeople] = useState<Record<number, AgentDetail | null>>({});
   const [events, setEvents] = useState<FeedEvent[]>([]);
   const key = (following ?? []).map((p) => p.id).join(",");
@@ -57,7 +62,7 @@ export function YourPeople() {
       <div className="panel p-5">
         <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="font-semibold">Your people</h2>
-          <span className="text-xs text-ink-3">Followed in this browser · no account needed</span>
+          <span className="text-xs text-ink-3">{me.agent != null ? "You, and the people you follow" : "Followed in this browser · no account needed"}</span>
         </div>
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {following.map((p) => {
@@ -65,12 +70,17 @@ export function YourPeople() {
             return (
               <li key={p.id} className="rounded-lg border border-line/60 p-3 text-sm">
                 <div className="flex items-start justify-between gap-2">
-                  <Link href={`/agents/${p.id}`} prefetch={false} className="font-medium text-ink hover:underline">
+                  <Link href={p.id === me.agent ? "/me" : `/agents/${p.id}`} prefetch={false} className="font-medium text-ink hover:underline">
                     {a ? `${a.name} ${a.surname}` : p.name}
+                    {p.id === me.agent && <span className="ml-1 text-god">(you)</span>}
                   </Link>
-                  <button type="button" onClick={() => toggleFollow(p)} className="text-xs text-ink-3 hover:text-ink" aria-label={`Stop following ${p.name}`}>
-                    ✕
-                  </button>
+                  {p.id === me.agent ? (
+                    <Link href="/world?find=me" prefetch={false} className="text-xs text-god hover:underline">◎ Find me</Link>
+                  ) : (
+                    <button type="button" onClick={() => toggleFollow(p)} className="text-xs text-ink-3 hover:text-ink" aria-label={`Stop following ${p.name}`}>
+                      ✕
+                    </button>
+                  )}
                 </div>
                 {a === null && <p className="mt-1 text-ink-3">Nothing is known about them right now.</p>}
                 {a && a.alive && (

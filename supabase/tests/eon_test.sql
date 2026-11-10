@@ -2,7 +2,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = extensions, public;
 
-select plan(147);
+select plan(150);
 
 -- Tests never contain the real God email: point the lock at a throwaway address for this
 -- transaction only (everything below is rolled back).
@@ -538,6 +538,24 @@ select ok((select a.soul_id is null and a.controller = 'auto' from sim.agents a 
           'when a player is removed, their person lives on as an ordinary life');                                            -- 146
 set local role authenticated;
 select ok((select count(*) > 0 from jsonb_array_elements(api.god_find('')) e), 'God can find anyone');                     -- 147
+reset role;
+
+-- Where am I? A player can find their own person; God can see every player's.
+insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, raw_user_meta_data, created_at, updated_at)
+values ('00000000-0000-0000-0000-000000000000', '77777777-7777-7777-7777-777777777777', 'authenticated', 'authenticated',
+        'finder@example.com', 'x', now(), '{"username":"finder"}', now(), now());
+select set_config('request.jwt.claims', json_build_object('sub', '77777777-7777-7777-7777-777777777777', 'role', 'authenticated', 'aal', 'aal1')::text, true);
+set local role authenticated;
+select api.request_life();
+select ok((api.whoami() ->> 'agent') is not null
+          and (api.whoami() ->> 'agent')::bigint = (select agent_id from app.souls where user_id = '77777777-7777-7777-7777-777777777777'),
+          'a player can always find their own person');                                                                         -- 148
+select throws_ok('select api.god_player_agents()', '42501', 'Only God may do this', 'players cannot see where every player is'); -- 149
+reset role;
+select set_config('request.jwt.claims', json_build_object('sub', '11111111-1111-1111-1111-111111111111', 'role', 'authenticated',
+  'aal', 'aal2', 'amr', json_build_array(json_build_object('method', 'totp', 'timestamp', extract(epoch from now())::bigint)))::text, true);
+set local role authenticated;
+select ok(exists (select 1 from jsonb_array_elements(api.god_player_agents()) e where e ->> 'username' = 'finder'), 'God sees every player''s person'); -- 150
 reset role;
 
 select * from finish();

@@ -8,7 +8,6 @@ import { BY, outcome, timeLeft } from "@/shared/choices";
 import { PROVIDERS } from "@/shared/providers";
 import { stageOf } from "@/shared/soul-mind";
 import { formatEonDate } from "@/shared/time";
-import { signOut } from "../login/actions";
 import { ChoiceCard } from "./ChoiceCard";
 import { ConnectAI } from "./ConnectAI";
 import { PrayForm } from "./PrayForm";
@@ -68,6 +67,25 @@ function Mind({ life }: { life: Life }) {
   );
 }
 
+/** What happens next, so a new player knows when to come back. */
+function Next({ life, age }: { life: Life; age: number }) {
+  const p = life.person!;
+  const name = first(life.name);
+  const lines: string[] = [];
+  if ((life.thoughts ?? []).length === 0 && life.mind !== "none") lines.push(`${name}'s first thought comes within a few minutes.`);
+  if (age < 16) {
+    const next = age + 1;
+    const wait = timeLeft(p.birthTick + next * 1440 - life.tick);
+    lines.push(
+      next === 16 ? `${name} turns 16 in ${wait}: old enough to choose their work.`
+        : `${name} turns ${next} in ${wait}: a new choice for the year.`,
+    );
+  } else {
+    lines.push("The big choices come when life brings them: love, marriage, children, quarrels.");
+  }
+  return <p className="mt-2 text-sm text-ink-3">{lines.join(" ")}</p>;
+}
+
 function Living({ life }: { life: Life }) {
   const p = life.person!;
   const age = Math.floor((life.tick - p.birthTick) / 1440);
@@ -102,6 +120,12 @@ function Living({ life }: { life: Life }) {
         </p>
         {kin.length > 0 && <p className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-sm text-ink-2">{kin}</p>}
         <Mind life={life} />
+        <Next life={life} age={age} />
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link href="/world?find=me" prefetch={false} className="btn btn-god text-sm">◎ Show me on the map</Link>
+          <Link href={`/family/${p.id}`} prefetch={false} className="btn btn-ghost text-sm">Family tree</Link>
+          <Link href={`/agents/${p.id}`} prefetch={false} className="btn btn-ghost text-sm">Life story</Link>
+        </div>
       </section>
 
       <section className="mt-8">
@@ -218,10 +242,12 @@ export default async function MePage() {
           <RequestLife />
         </>
       )}
-      {life && <ConnectAI current={life.key} />}
-      <form action={signOut} className="mt-8">
-        <button className="btn btn-ghost">Sign out</button>
-      </form>
+      {life && (
+        <ConnectAI
+          current={life.key}
+          folded={life.mind === "world" && life.trialUntil != null ? `not needed for ${timeLeft(life.trialUntil - life.tick)} yet` : life.status !== "living" && life.freeDays ? "not needed for your first three days" : undefined}
+        />
+      )}
     </div>
   );
 }

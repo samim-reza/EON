@@ -12,13 +12,12 @@ const STATUS: Record<KeyInfo["status"], string> = {
   invalid: "no longer accepted: connect a new key",
 };
 
-export function ConnectAI({ current }: { current: KeyInfo | null }) {
+export function ConnectAI({ current, folded }: { current: KeyInfo | null; folded?: string }) {
   const [state, action, pending] = useActionState<KeyState, FormData>(connectKey, { error: null });
   const [provider, setProvider] = useState<ProviderId>(current?.provider ?? "gemini");
   const p = PROVIDERS[provider];
-  return (
-    <section className="panel mt-8 p-5">
-      <h2 className="text-lg font-semibold">Your AI</h2>
+  const body = (
+    <>
       <p className="mt-1 text-sm text-ink-2">
         Your person&apos;s mind runs on an AI you bring: a few short calls a day, only for your own person. EON checks your key
         with its provider, stores it encrypted, and never shows it again.
@@ -63,6 +62,23 @@ export function ConnectAI({ current }: { current: KeyInfo | null }) {
           {pending ? "Checking with the provider…" : current ? "Replace key" : "Connect"}
         </button>
       </form>
+    </>
+  );
+  // During the free days the form waits behind one line, so nobody thinks they need a key yet.
+  if (folded && !current && !state.error && !state.saved) {
+    return (
+      <details className="panel mt-8 p-5">
+        <summary className="cursor-pointer text-lg font-semibold">
+          Your AI <span className="ml-1 text-sm font-normal text-ink-3">{folded}</span>
+        </summary>
+        <div className="mt-2">{body}</div>
+      </details>
+    );
+  }
+  return (
+    <section className="panel mt-8 p-5">
+      <h2 className="text-lg font-semibold">Your AI</h2>
+      {body}
     </section>
   );
 }

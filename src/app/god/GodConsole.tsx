@@ -200,122 +200,124 @@ export function GodConsole({ state }: { state: GodState }) {
         </button>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="panel p-5">
-          <h2 className="font-semibold">Population pyramid</h2>
-          <div className="mt-3 space-y-1">
-            {[...state.pyramid].reverse().map((b) => (
-              <div key={b.band} className="grid grid-cols-[1fr_3rem_1fr] items-center gap-2 text-xs">
-                <div className="flex justify-end">
-                  <div className="h-3 rounded-l bg-love/70" style={{ width: `${(b.F / maxBand) * 100}%` }} />
+      <nav className="sticky top-14 z-30 -mx-1 flex flex-wrap gap-1 rounded-lg bg-bg/85 px-1 py-1 text-sm backdrop-blur">
+        {[["players", "Players"], ["souls", "Prayers & souls"], ["world", "The world"], ["powers", "Powers"], ["audit", "Audit"]].map(([id, label]) => (
+          <a key={id} href={`#${id}`} className="tag hover:text-ink">{label}</a>
+        ))}
+      </nav>
+
+      <div id="players" className="scroll-mt-20 grid gap-6 lg:grid-cols-2">
+        <div className="panel space-y-3 p-5">
+          <h2 className="font-semibold">Players</h2>
+          <p className="text-xs text-ink-3">Every account, newest first. Everything you do here is recorded in the audit log.</p>
+          <Result s={played} />
+          <Result s={overruled} />
+          {(state.players ?? []).length === 0 && <p className="text-sm text-ink-3">No players yet.</p>}
+          <ul className="max-h-[32rem] divide-y divide-line/60 overflow-auto text-sm">
+            {(state.players ?? []).map((p) => (
+              <li key={p.userId} className="py-3">
+                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                  <span className="font-medium text-ink">{p.username}</span>
+                  <span className="text-xs text-ink-3">
+                    joined {day(p.joined)} · last seen {day(p.lastSeen)} · {p.lives} {p.lives === 1 ? "life" : "lives"}
+                    {p.confirmed ? "" : " · email not confirmed"}
+                  </span>
                 </div>
-                <div className="text-center text-ink-3">{b.band === 100 ? "100+" : `${b.band}s`}</div>
-                <div className="h-3 rounded-r bg-life/70" style={{ width: `${(b.M / maxBand) * 100}%` }} />
-              </div>
-            ))}
-          </div>
-          <h3 className="mt-5 text-sm font-semibold">Settlements</h3>
-          <ul className="mt-2 grid grid-cols-2 gap-1 text-sm text-ink-2">
-            {state.settlements.map((s) => (
-              <li key={s.id}>
-                #{s.id} {s.name} <span className="text-ink-3">({s.kind}, {s.pop})</span>
+                <p className="mt-1 text-ink-2">
+                  {p.status === "living" && p.agent ? (
+                    <>
+                      Lives as <Link href={`/agents/${p.agent}`} prefetch={false} className="text-ink hover:underline">{p.person}</Link> (#{p.agent}), {p.age}{p.place ? `, ${p.place}` : ""}
+                      {" · "}<Link href={`/world?agent=${p.agent}`} prefetch={false} className="text-god hover:underline">show on map</Link>
+                    </>
+                  ) : p.status === "waiting" ? "Waiting for a life"
+                    : p.status === "assigned" ? "Waiting to be born"
+                      : p.status === "ended" ? `Last life ended${p.person ? `: ${p.person}` : ""}` : "Has not asked for a life"}
+                </p>
+                {p.status === "living" && (
+                  <p className="text-xs text-ink-3">
+                    {p.mind === "world" ? `EON's mind until ${p.trialUntil != null ? formatEonDate(p.trialUntil) : "soon"}`
+                      : p.mind === "own" ? `Own AI: ${p.key ?? ""}` : "No mind: watching only"}
+                    {p.key && p.mind !== "own" ? ` · key ${p.key}` : ""}
+                  </p>
+                )}
+                {(() => {
+                  const life = (state.lives ?? []).find((l) => l.id === p.soul);
+                  if (!life) return null;
+                  return (
+                    <>
+                      {life.thought && <p className="mt-1 italic text-ink-2">&ldquo;{life.thought}&rdquo;</p>}
+                      {life.pending.map((c) => (
+                        <form key={c.id} action={overruleAction} className="mt-2 flex flex-wrap items-center gap-1">
+                          <input type="hidden" name="choice" value={c.id} />
+                          <span className="text-xs text-ink-2">
+                            Deciding: {c.kind}{c.about ? ` (${c.about})` : ""}{c.choice ? ` · ${c.by} chose ${c.choice}` : ""}. Overrule:
+                          </span>
+                          {c.options.map((o) => (
+                            <button key={o.id} name="option" value={o.id} className="btn btn-ghost text-xs" disabled={overruling}>{o.label}</button>
+                          ))}
+                        </form>
+                      ))}
+                    </>
+                  );
+                })()}
+                <form action={playAction} onSubmit={confirmDanger} className="mt-2 flex flex-wrap gap-1">
+                  <input type="hidden" name="user" value={p.userId} />
+                  {p.soul != null && <input type="hidden" name="soul" value={p.soul} />}
+                  {p.status === "living" && <button name="op" value="extend" className="btn btn-ghost text-xs" disabled={playing}>+3 free days</button>}
+                  {p.status && p.status !== "ended" && <button name="op" value="take" className="btn btn-ghost text-xs" disabled={playing}>Take back the soul</button>}
+                  {p.key && <button name="op" value="revoke" className="btn btn-ghost text-xs" disabled={playing}>Revoke key</button>}
+                  <button name="op" value="remove" className="btn btn-ghost text-xs text-death" disabled={playing}>Remove player</button>
+                </form>
               </li>
             ))}
           </ul>
         </div>
 
-        <form action={balanceAction} className="panel space-y-3 p-5">
-          <h2 className="font-semibold">Balance the world</h2>
-          <Slider name="fertility_mult" label="Fertility" value={w.fertility_mult} min={0} max={5} step={0.05} hint="1 = natural" />
-          <Slider name="mortality_mult" label="Mortality" value={w.mortality_mult} min={0.2} max={5} step={0.05} hint="redraws every fate" />
-          <Slider name="disease_mult" label="Disease" value={w.disease_mult} min={0} max={5} step={0.05} hint="outbreaks & spread" />
-          <Slider name="crime_mult" label="Quarrels & crime" value={w.crime_mult} min={0} max={5} step={0.05} hint="1 = natural, 0 = perfect peace" />
-          <Slider name="temp_shift" label="World temperature" value={w.temp_shift} min={-20} max={20} step={0.5} hint="°C added everywhere: 0 = natural" />
-          <Slider name="rain_mult" label="Rainfall" value={w.rain_mult} min={0} max={4} step={0.05} hint="1 = natural, 0 = endless drought" />
-          <Slider name="llm_cap" label="AI budget per day, $" value={w.llm_cap ?? 0.5} min={0} max={5} step={0.05} hint="0 turns the AI off" />
-          <Slider name="female_ratio" label="Share of girls at birth" value={w.female_ratio} min={0.3} max={0.7} step={0.01} hint="0.5 = even" />
-          <Slider name="capacity_k" label="Land capacity (K)" value={w.capacity_k} min={50} max={200000} step={50} hint="population settles ≈ 1.7 × K" />
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" name="autopilot" defaultChecked={w.autopilot} /> Autopilot (sends founders during Genesis, acts when you are away)
-          </label>
-          <Result s={balance} />
-          <button className="btn btn-god w-full" disabled={balancing}>
-            {balancing ? "Rebalancing…" : "Apply"}
-          </button>
-        </form>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-3">
-        <form action={healAction} className="panel space-y-3 p-5">
-          <h2 className="font-semibold">Miracle: heal</h2>
-          <p className="text-xs text-ink-3">Cures illness and grants a fresh fate.</p>
-          <input name="agent" placeholder="Agent id" inputMode="numeric" className="input" />
+        <div className="panel space-y-3 p-5">
+          <h2 className="font-semibold">Find anyone</h2>
+          <p className="text-xs text-ink-3">By name or id. Players&apos; people come first. Leave it empty to list the oldest.</p>
+          <form action={findAction} className="flex gap-2">
+            <input name="q" placeholder="Name or id" className="input" maxLength={60} />
+            <button className="btn btn-god" disabled={finding}>Find</button>
+          </form>
+          {found.error && <p className="text-sm text-death">{found.error}</p>}
           <Result s={healed} />
-          <button className="btn btn-life w-full" disabled={healing}>Heal</button>
-        </form>
-        <form action={smiteAction} className="panel space-y-3 p-5">
-          <h2 className="font-semibold">Sudden death</h2>
-          <p className="text-xs text-ink-3">Takes effect next tick. Irreversible.</p>
-          <input name="agent" placeholder="Agent id" inputMode="numeric" className="input" />
-          <select name="cause" className="input" defaultValue="Core Arrest">
-            <option>Core Arrest</option>
-            <option>Logic Stroke</option>
-            <option>Accident</option>
-            <option>Divine Will</option>
-          </select>
+          <Result s={signed} />
           <Result s={smitten} />
-          <button className="btn btn-ghost w-full text-death" disabled={smiting}>Take this life</button>
-        </form>
-        <form action={founderAction} className="panel space-y-3 p-5">
-          <h2 className="font-semibold">Create a founder</h2>
-          <div className="grid grid-cols-2 gap-2">
-            <input name="name" placeholder="Name" className="input" />
-            <input name="surname" placeholder="Family name" className="input" />
-            <select name="sex" className="input" defaultValue="F">
-              <option value="F">Female</option>
-              <option value="M">Male</option>
-            </select>
-            <input name="age" type="number" min={16} max={60} defaultValue={20} className="input" />
-          </div>
-          <select name="settlement" className="input">
-            {state.settlements.map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
+          <ul className="max-h-[28rem] divide-y divide-line/60 overflow-auto text-sm">
+            {((found.data as Found[] | undefined) ?? []).map((a) => (
+              <li key={a.id} className="py-2">
+                <div className="flex flex-wrap items-baseline gap-x-2">
+                  <Link href={`/agents/${a.id}`} prefetch={false} className="text-ink hover:underline">#{a.id} {a.name}</Link>
+                  <Link href={`/world?agent=${a.id}`} prefetch={false} className="text-xs text-god hover:underline">map</Link>
+                  <span className="text-xs text-ink-3">
+                    {a.sex === "F" ? "♀" : "♂"} {a.age} · {a.work} · {a.place ?? "?"} · health {a.health}
+                    {a.player ? ` · soul of ${a.player}` : ""}{a.controller === "god" ? " · possessed" : ""}
+                  </span>
+                </div>
+                <div className="mt-1 flex flex-wrap items-center gap-1">
+                  <form action={healAction}>
+                    <input type="hidden" name="agent" value={a.id} />
+                    <button className="btn btn-ghost text-xs" disabled={healing}>Heal</button>
+                  </form>
+                  <form action={signAction} className="flex gap-1">
+                    <input type="hidden" name="agent" value={a.id} />
+                    <input name="text" placeholder="Send a dream" className="input h-7 w-40 text-xs" maxLength={200} />
+                    <button className="btn btn-ghost text-xs" disabled={signing}>Send</button>
+                  </form>
+                  <form action={smiteAction} onSubmit={confirmDanger}>
+                    <input type="hidden" name="agent" value={a.id} />
+                    <input type="hidden" name="cause" value="Divine Will" />
+                    <button value="smite" className="btn btn-ghost text-xs text-death" disabled={smiting}>Take this life</button>
+                  </form>
+                </div>
+              </li>
             ))}
-          </select>
-          <Result s={founder} />
-          <button className="btn btn-god w-full" disabled={founding}>Create</button>
-        </form>
-        <form action={settleAction} className="panel space-y-3 p-5">
-          <h2 className="font-semibold">Found a settlement</h2>
-          <p className="text-xs text-ink-3">A new village starts as a gathering place. Create founders there, or move people to it.</p>
-          <input name="name" placeholder="Name of the settlement" className="input" maxLength={24} />
-          <select name="site" className="input">
-            {(state.sites ?? []).map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.biome ? BIOME_NAMES[s.biome] : "unknown land"}
-                {s.river > 0 ? ", by a river" : ""}
-                {s.coast ? ", on the coast" : ""} ({Math.round(s.x)}, {Math.round(s.y)})
-              </option>
-            ))}
-          </select>
-          <Result s={settled} />
-          <button className="btn btn-god w-full" disabled={settling}>Found it</button>
-        </form>
-        <form action={moveAction} className="panel space-y-3 p-5">
-          <h2 className="font-semibold">Move someone</h2>
-          <p className="text-xs text-ink-3">Their partner and young children go with them. The id is in the address of their profile.</p>
-          <input name="agent" type="number" min={1} placeholder="Agent id" className="input" />
-          <select name="settlement" className="input">
-            {state.settlements.map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
-          <Result s={moved} />
-          <button className="btn btn-god w-full" disabled={moving}>Move</button>
-        </form>
+          </ul>
+        </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div id="souls" className="scroll-mt-20 grid gap-6 lg:grid-cols-3">
         <div className="panel space-y-3 p-5">
           <h2 className="font-semibold">Prayers</h2>
           <p className="text-xs text-ink-3">Anything left unanswered for 6 hours is answered by the world itself.</p>
@@ -392,139 +394,122 @@ export function GodConsole({ state }: { state: GodState }) {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="panel space-y-3 p-5 lg:col-span-2">
-          <h2 className="font-semibold">Souls living their lives</h2>
-          <p className="text-xs text-ink-3">
-            Players&apos; people. Their choices are their own, but you can overrule any of them before it happens.
-          </p>
-          <Result s={overruled} />
-          {(state.lives ?? []).length === 0 && <p className="text-sm text-ink-3">No player is alive yet.</p>}
-          <ul className="max-h-[28rem] divide-y divide-line/60 overflow-auto text-sm">
-            {(state.lives ?? []).map((l) => (
-              <li key={l.id} className="py-3">
-                <div className="flex flex-wrap items-baseline gap-2">
-                  <Link href={`/agents/${l.agentId}`} prefetch={false} className="text-ink hover:underline">{l.name}</Link>
-                  <span className="text-ink-3">#{l.agentId} · {l.age} y · {l.username}</span>
-                  <span className="tag">
-                    {l.mind === "world" ? `EON's mind until ${l.trialUntil != null ? formatEonDate(l.trialUntil) : "soon"}`
-                      : l.mind === "own" ? `own AI · ${l.key ?? ""}` : "watching only"}
-                  </span>
+      <div id="world" className="scroll-mt-20 grid gap-6 lg:grid-cols-2">
+        <div className="panel p-5">
+          <h2 className="font-semibold">Population pyramid</h2>
+          <div className="mt-3 space-y-1">
+            {[...state.pyramid].reverse().map((b) => (
+              <div key={b.band} className="grid grid-cols-[1fr_3rem_1fr] items-center gap-2 text-xs">
+                <div className="flex justify-end">
+                  <div className="h-3 rounded-l bg-love/70" style={{ width: `${(b.F / maxBand) * 100}%` }} />
                 </div>
-                {l.thought && <p className="mt-1 italic text-ink-2">&ldquo;{l.thought}&rdquo;</p>}
-                {l.pending.map((c) => (
-                  <form key={c.id} action={overruleAction} className="mt-2 flex flex-wrap items-center gap-1">
-                    <input type="hidden" name="choice" value={c.id} />
-                    <span className="text-ink-2">
-                      {c.kind}{c.about ? ` (${c.about})` : ""}{c.choice ? ` · ${c.by} chose ${c.choice}` : ""}:
-                    </span>
-                    {c.options.map((o) => (
-                      <button key={o.id} name="option" value={o.id} className="btn btn-ghost text-xs" disabled={overruling}>{o.label}</button>
-                    ))}
-                  </form>
-                ))}
+                <div className="text-center text-ink-3">{b.band === 100 ? "100+" : `${b.band}s`}</div>
+                <div className="h-3 rounded-r bg-life/70" style={{ width: `${(b.M / maxBand) * 100}%` }} />
+              </div>
+            ))}
+          </div>
+          <h3 className="mt-5 text-sm font-semibold">Settlements</h3>
+          <ul className="mt-2 grid grid-cols-2 gap-1 text-sm text-ink-2">
+            {state.settlements.map((s) => (
+              <li key={s.id}>
+                #{s.id} {s.name} <span className="text-ink-3">({s.kind}, {s.pop})</span>
               </li>
             ))}
           </ul>
         </div>
-        <form action={signAction} className="panel space-y-3 p-5">
-          <h2 className="font-semibold">Send a sign</h2>
-          <p className="text-xs text-ink-3">
-            A dream or a feeling. A player&apos;s person sees it and decides whether to heed it; anyone else follows their faith.
-          </p>
-          <input name="agent" type="number" min={1} placeholder="Agent id" className="input" />
-          <input name="text" placeholder="What they dream" className="input" maxLength={200} />
-          <Result s={signed} />
-          <button className="btn btn-god w-full" disabled={signing}>Send the sign</button>
+
+        <form action={balanceAction} className="panel space-y-3 p-5">
+          <h2 className="font-semibold">Balance the world</h2>
+          <Slider name="fertility_mult" label="Fertility" value={w.fertility_mult} min={0} max={5} step={0.05} hint="1 = natural" />
+          <Slider name="mortality_mult" label="Mortality" value={w.mortality_mult} min={0.2} max={5} step={0.05} hint="redraws every fate" />
+          <Slider name="disease_mult" label="Disease" value={w.disease_mult} min={0} max={5} step={0.05} hint="outbreaks & spread" />
+          <Slider name="crime_mult" label="Quarrels & crime" value={w.crime_mult} min={0} max={5} step={0.05} hint="1 = natural, 0 = perfect peace" />
+          <Slider name="temp_shift" label="World temperature" value={w.temp_shift} min={-20} max={20} step={0.5} hint="°C added everywhere: 0 = natural" />
+          <Slider name="rain_mult" label="Rainfall" value={w.rain_mult} min={0} max={4} step={0.05} hint="1 = natural, 0 = endless drought" />
+          <Slider name="llm_cap" label="AI budget per day, $" value={w.llm_cap ?? 0.5} min={0} max={5} step={0.05} hint="0 turns the AI off" />
+          <Slider name="female_ratio" label="Share of girls at birth" value={w.female_ratio} min={0.3} max={0.7} step={0.01} hint="0.5 = even" />
+          <Slider name="capacity_k" label="Land capacity (K)" value={w.capacity_k} min={50} max={200000} step={50} hint="population settles ≈ 1.7 × K" />
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" name="autopilot" defaultChecked={w.autopilot} /> Autopilot (sends founders during Genesis, acts when you are away)
+          </label>
+          <Result s={balance} />
+          <button className="btn btn-god w-full" disabled={balancing}>
+            {balancing ? "Rebalancing…" : "Apply"}
+          </button>
         </form>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="panel space-y-3 p-5">
-          <h2 className="font-semibold">Players</h2>
-          <p className="text-xs text-ink-3">Every account, newest first. Everything you do here is recorded in the audit log.</p>
-          <Result s={played} />
-          {(state.players ?? []).length === 0 && <p className="text-sm text-ink-3">No players yet.</p>}
-          <ul className="max-h-[32rem] divide-y divide-line/60 overflow-auto text-sm">
-            {(state.players ?? []).map((p) => (
-              <li key={p.userId} className="py-3">
-                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                  <span className="font-medium text-ink">{p.username}</span>
-                  <span className="text-xs text-ink-3">
-                    joined {day(p.joined)} · last seen {day(p.lastSeen)} · {p.lives} {p.lives === 1 ? "life" : "lives"}
-                    {p.confirmed ? "" : " · email not confirmed"}
-                  </span>
-                </div>
-                <p className="mt-1 text-ink-2">
-                  {p.status === "living" && p.agent ? (
-                    <>Lives as <Link href={`/agents/${p.agent}`} prefetch={false} className="text-ink hover:underline">{p.person}</Link> (#{p.agent}), {p.age}{p.place ? `, ${p.place}` : ""}</>
-                  ) : p.status === "waiting" ? "Waiting for a life"
-                    : p.status === "assigned" ? "Waiting to be born"
-                      : p.status === "ended" ? `Last life ended${p.person ? `: ${p.person}` : ""}` : "Has not asked for a life"}
-                </p>
-                {p.status === "living" && (
-                  <p className="text-xs text-ink-3">
-                    {p.mind === "world" ? `EON's mind until ${p.trialUntil != null ? formatEonDate(p.trialUntil) : "soon"}`
-                      : p.mind === "own" ? `Own AI: ${p.key ?? ""}` : "No mind: watching only"}
-                    {p.key && p.mind !== "own" ? ` · key ${p.key}` : ""}
-                  </p>
-                )}
-                <form action={playAction} onSubmit={confirmDanger} className="mt-2 flex flex-wrap gap-1">
-                  <input type="hidden" name="user" value={p.userId} />
-                  {p.soul != null && <input type="hidden" name="soul" value={p.soul} />}
-                  {p.status === "living" && <button name="op" value="extend" className="btn btn-ghost text-xs" disabled={playing}>+3 free days</button>}
-                  {p.status && p.status !== "ended" && <button name="op" value="take" className="btn btn-ghost text-xs" disabled={playing}>Take back the soul</button>}
-                  {p.key && <button name="op" value="revoke" className="btn btn-ghost text-xs" disabled={playing}>Revoke key</button>}
-                  <button name="op" value="remove" className="btn btn-ghost text-xs text-death" disabled={playing}>Remove player</button>
-                </form>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="panel space-y-3 p-5">
-          <h2 className="font-semibold">Find anyone</h2>
-          <p className="text-xs text-ink-3">By name or id. Players&apos; people come first. Leave it empty to list the oldest.</p>
-          <form action={findAction} className="flex gap-2">
-            <input name="q" placeholder="Name or id" className="input" maxLength={60} />
-            <button className="btn btn-god" disabled={finding}>Find</button>
-          </form>
-          {found.error && <p className="text-sm text-death">{found.error}</p>}
+      <div id="powers" className="scroll-mt-20 grid gap-6 lg:grid-cols-3">
+        <form action={healAction} className="panel space-y-3 p-5">
+          <h2 className="font-semibold">Miracle: heal</h2>
+          <p className="text-xs text-ink-3">Cures illness and grants a fresh fate.</p>
+          <input name="agent" placeholder="Agent id" inputMode="numeric" className="input" />
           <Result s={healed} />
+          <button className="btn btn-life w-full" disabled={healing}>Heal</button>
+        </form>
+        <form action={smiteAction} className="panel space-y-3 p-5">
+          <h2 className="font-semibold">Sudden death</h2>
+          <p className="text-xs text-ink-3">Takes effect next tick. Irreversible.</p>
+          <input name="agent" placeholder="Agent id" inputMode="numeric" className="input" />
+          <select name="cause" className="input" defaultValue="Core Arrest">
+            <option>Core Arrest</option>
+            <option>Logic Stroke</option>
+            <option>Accident</option>
+            <option>Divine Will</option>
+          </select>
           <Result s={smitten} />
-          <ul className="max-h-[28rem] divide-y divide-line/60 overflow-auto text-sm">
-            {((found.data as Found[] | undefined) ?? []).map((a) => (
-              <li key={a.id} className="py-2">
-                <div className="flex flex-wrap items-baseline gap-x-2">
-                  <Link href={`/agents/${a.id}`} prefetch={false} className="text-ink hover:underline">#{a.id} {a.name}</Link>
-                  <span className="text-xs text-ink-3">
-                    {a.sex === "F" ? "♀" : "♂"} {a.age} · {a.work} · {a.place ?? "?"} · health {a.health}
-                    {a.player ? ` · soul of ${a.player}` : ""}{a.controller === "god" ? " · possessed" : ""}
-                  </span>
-                </div>
-                <div className="mt-1 flex flex-wrap items-center gap-1">
-                  <form action={healAction}>
-                    <input type="hidden" name="agent" value={a.id} />
-                    <button className="btn btn-ghost text-xs" disabled={healing}>Heal</button>
-                  </form>
-                  <form action={signAction} className="flex gap-1">
-                    <input type="hidden" name="agent" value={a.id} />
-                    <input name="text" placeholder="Send a dream" className="input h-7 w-40 text-xs" maxLength={200} />
-                    <button className="btn btn-ghost text-xs" disabled={signing}>Send</button>
-                  </form>
-                  <form action={smiteAction} onSubmit={confirmDanger}>
-                    <input type="hidden" name="agent" value={a.id} />
-                    <input type="hidden" name="cause" value="Divine Will" />
-                    <button value="smite" className="btn btn-ghost text-xs text-death" disabled={smiting}>Take this life</button>
-                  </form>
-                </div>
-              </li>
+          <button className="btn btn-ghost w-full text-death" disabled={smiting}>Take this life</button>
+        </form>
+        <form action={founderAction} className="panel space-y-3 p-5">
+          <h2 className="font-semibold">Create a founder</h2>
+          <div className="grid grid-cols-2 gap-2">
+            <input name="name" placeholder="Name" className="input" />
+            <input name="surname" placeholder="Family name" className="input" />
+            <select name="sex" className="input" defaultValue="F">
+              <option value="F">Female</option>
+              <option value="M">Male</option>
+            </select>
+            <input name="age" type="number" min={16} max={60} defaultValue={20} className="input" />
+          </div>
+          <select name="settlement" className="input">
+            {state.settlements.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
             ))}
-          </ul>
-        </div>
+          </select>
+          <Result s={founder} />
+          <button className="btn btn-god w-full" disabled={founding}>Create</button>
+        </form>
+        <form action={settleAction} className="panel space-y-3 p-5">
+          <h2 className="font-semibold">Found a settlement</h2>
+          <p className="text-xs text-ink-3">A new village starts as a gathering place. Create founders there, or move people to it.</p>
+          <input name="name" placeholder="Name of the settlement" className="input" maxLength={24} />
+          <select name="site" className="input">
+            {(state.sites ?? []).map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.biome ? BIOME_NAMES[s.biome] : "unknown land"}
+                {s.river > 0 ? ", by a river" : ""}
+                {s.coast ? ", on the coast" : ""} ({Math.round(s.x)}, {Math.round(s.y)})
+              </option>
+            ))}
+          </select>
+          <Result s={settled} />
+          <button className="btn btn-god w-full" disabled={settling}>Found it</button>
+        </form>
+        <form action={moveAction} className="panel space-y-3 p-5">
+          <h2 className="font-semibold">Move someone</h2>
+          <p className="text-xs text-ink-3">Their partner and young children go with them. The id is in the address of their profile.</p>
+          <input name="agent" type="number" min={1} placeholder="Agent id" className="input" />
+          <select name="settlement" className="input">
+            {state.settlements.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+          <Result s={moved} />
+          <button className="btn btn-god w-full" disabled={moving}>Move</button>
+        </form>
       </div>
 
-      <div className="panel p-5">
+      <div id="audit" className="panel scroll-mt-20 p-5">
         <h2 className="font-semibold">Audit log</h2>
         <p className="text-xs text-ink-3">Every act of God and autopilot, hash-chained and append-only.</p>
         <ul className="mt-3 divide-y divide-line/60 text-sm">
