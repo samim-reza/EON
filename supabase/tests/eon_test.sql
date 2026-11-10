@@ -269,6 +269,8 @@ update sim.agents set piety = 100 where id = (select id from asked);
 select sim.p_prayers(w.tick) from sim.world w;
 select isnt((select status from app.prayers where agent_id = (select id from asked) order by id limit 1), 'open', 'an old prayer is answered without God'); -- 79
 
+-- Use up today's arrivals so the old path (waiting for a pregnancy) is tested too; cleared before the arrival tests.
+select sim.log((select tick from sim.world), 'family_arrives', 0::smallint, null, null, null, '{"test": true}') from generate_series(1, 20);
 set local role anon;
 select throws_ok('select api.request_life()', '42501', null, 'visitors cannot ask for a life directly');                                     -- 80
 reset role;
@@ -561,6 +563,7 @@ select ok(exists (select 1 from jsonb_array_elements(api.god_player_agents()) e 
 reset role;
 
 -- When no young child is free, a family arrives with a newborn, and the soul becomes that baby at once.
+delete from sim.events where kind = 'family_arrives' and data ->> 'test' = 'true';
 update sim.agents a set birth_tick = birth_tick - 4 * 1440 from sim.world w where a.soul_id is null and w.tick - a.birth_tick < 3 * 1440;
 insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, raw_user_meta_data, created_at, updated_at)
 values ('00000000-0000-0000-0000-000000000000', '88888888-8888-8888-8888-888888888888', 'authenticated', 'authenticated',
