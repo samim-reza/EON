@@ -52,13 +52,11 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 /** A head count the way a villager would give it: nobody counts deer to the last one. */
 export function roughly(n: number): string {
   if (n < 1) return "none";
-  if (n < 4) return "a few";
-  if (n < 12) return "about ten";
-  if (n < 30) return "a couple of dozen";
-  if (n < 80) return "about fifty";
-  if (n < 160) return "about a hundred";
-  if (n < 400) return "a few hundred";
-  return "many hundreds";
+  if (n < 6) return "a few";
+  if (n < 15) return "about ten";
+  if (n >= 1000) return "more than a thousand";
+  const step = n < 100 ? 10 : n < 300 ? 50 : 100;
+  return `about ${Math.round(n / step) * step}`;
 }
 
 export type LandLine = { label: string; text: string; tone?: "good" | "bad" };

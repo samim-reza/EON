@@ -46,9 +46,12 @@ describe("describeLand", () => {
 describe("roughly", () => {
   it("counts the way a villager would", () => {
     expect(roughly(0)).toBe("none");
-    expect(roughly(3)).toBe("a few");
-    expect(roughly(100)).toBe("about a hundred");
-    expect(roughly(5000)).toBe("many hundreds");
+    expect(roughly(4)).toBe("a few");
+    expect(roughly(9)).toBe("about ten");
+    expect(roughly(36)).toBe("about 40");
+    expect(roughly(207)).toBe("about 200");
+    expect(roughly(529)).toBe("about 500");
+    expect(roughly(5000)).toBe("more than a thousand");
   });
 });
 
