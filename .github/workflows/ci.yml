@@ -34,8 +34,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # Pinned: asking GitHub for "latest" on every run is rate-limited and fails the job at random,
+      # and a fixed version means a new CLI release can never change what CI does unnoticed.
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 3.1.0
       - run: supabase start -x imgproxy,edge-runtime,logflare,vector,supavisor,postgres-meta,studio,storage-api,realtime
       - run: supabase test db
