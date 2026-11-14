@@ -369,8 +369,9 @@ with measurements, and it's a good read if you want to learn them.
 |---|---|
 | Event bundles | `/api/pub/bundle/{k}` covers 5 ticks and is `immutable` once complete, so the CDN serves every viewer the same bytes |
 | World snapshot | `/api/pub/world/{version}` is immutable while the population is unchanged |
+| The land | `/api/pub/land/{month}` carries only woods, soil and herds, keyed by the EON month, so the heavy snapshot is never fetched again because a tree grew |
 | Pages | Incremental static regeneration, revalidated every 15–300 s |
-| Map | Terrain and agent positions are computed in the browser, on a background thread, and off-screen settlements are skipped |
+| Map | Terrain and agent positions are computed in the browser, on a background thread. A spatial grid finds what is on screen or under the pointer, results that hold for a while are remembered (land or sea, herd layouts, each person's half-hour plan), and trees, animals and people are drawn in batches: about 17 canvas calls where 22,000 were needed |
 | Live data | One shared poller for the whole page, paused in hidden tabs. Clocks run on their own between polls |
 | Navigation | Link prefetching is off, so a list of names doesn't trigger a server render for each one |
 | Database size | Events are partitioned per day and dropped after 14 days (important ones are kept in the chronicle). A size guard throttles the world before it reaches the 500 MB free limit |
@@ -441,7 +442,7 @@ Copy `.env.example` to `.env.local`. Never commit real values.
 npm run lint && npm run typecheck
 npm test                      # Vitest: life table, fertility, calendar, climate, nature, key sealing, providers, a soul's mind, choices, emails
 npm run lab -- 10 300         # 10 worlds × 300 EON years, with pass/fail checks
-npx supabase test db          # pgTAP on a fresh database: 185 checks of the security model, engine, sign-up, souls, choices, keys, deeds and the living world
+npx supabase test db          # pgTAP on a fresh database: 187 checks of the security model, engine, sign-up, souls, choices, keys, deeds and the living world
 ```
 
 The lab asserts that worlds survive, life expectancy stays near 60, under-5 deaths stay around 3 %, no close-kin union

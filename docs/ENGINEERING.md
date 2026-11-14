@@ -136,6 +136,19 @@ can never change, so it's served with `Cache-Control: immutable` for a year.
 
 **Use it when:** data is append-only or versionable. Bundlers do this for JavaScript files.
 
+### Key each resource by what changes it
+
+**What:** the map loads two things. `/api/pub/world/{version}` holds everyone alive and every building, and its key
+is the roster version, which moves when someone is born, dies or moves. `/api/pub/land/{month}` holds the woods,
+soil and herds around each village, and its key is the EON month.
+
+**Why:** the land changes by itself, without anyone being born. Putting it in the big snapshot meant choosing between
+stale woods and re-downloading the whole population every time a tree grew. Split by what changes them, each is
+fetched exactly when it has changed: the heavy one rarely, the light one twelve times a real day.
+
+**Use it when:** one response mixes data that changes at different rates. The slowest-changing part decides how long
+the response can be cached, so separate them.
+
 ### Stale-while-revalidate
 
 **What:** `s-maxage=10, stale-while-revalidate=20` lets the CDN answer instantly with slightly old data while it
@@ -357,6 +370,41 @@ This is a **broad phase**, the same idea game engines use to avoid testing every
 
 **Why:** the cost of a frame follows what's visible, not how many agents exist.
 
+### A grid, not a search
+
+**What:** `src/shared/spatial.ts` hashes villages into 64-unit cells. "Which villages are on screen?" and "what is
+under the pointer?" look at a few cells instead of every village, building and person in the world.
+
+**Why:** hovering asks that question fourteen times a second, and the frame asks it thirty times. A scan grows with
+the world; a grid lookup grows with what is nearby. A grid suits EON better than a quadtree: villages are spread
+fairly evenly, never move, and the index is rebuilt only when one is founded.
+
+**Use it when:** you ask "what is near this point?" often, about things that rarely move. (**Spatial hashing**.)
+
+### Work it out once
+
+Three places where the map used to redo the same sum every frame:
+
+- **Is this land?** takes six layers of noise, and every animal asked it every frame. `landLookup` keeps one byte
+  per map unit and fills it in the first time a point is asked about (**lazy memoisation**).
+- **Where does this herd stand?** came from hashing the village's id forty times a frame. The hashes never change, so
+  they are kept in a flat array per village; a frame only applies the clock.
+- **What is this person doing?** A plan holds for a whole half-hour, which is 150 frames. It is worked out once per
+  half-hour, and the frames in between only move the person along their path.
+
+**Use it when:** a value depends on inputs that change far less often than you read it.
+
+### Batch the draw calls
+
+**What:** every tree of one colour goes into one path and is filled once. The same for animals, chimney smoke, and
+people seen as dots: sorted by colour first, then one canvas call per colour.
+
+**Why:** a canvas is slow per call, not per shape. With 86 villages on screen, drawing each tree and animal by itself
+took 22,471 canvas calls a frame; in batches it takes 17, and the number no longer grows with the world.
+
+**Use it when:** you draw many things that share a style. Game engines call this **batching**, and tests in
+`scenery.test.ts` hold the line: five thousand animals must cost no more calls than ten.
+
 ### Spend only when someone is looking
 
 The landing map runs at 20 fps instead of 30, stops when scrolled out of view (`IntersectionObserver`), and respects
@@ -392,6 +440,8 @@ From a production build, comparing the first deployed version with the current o
 | Requests when opening the feed | 30 | **13** |
 | Longest main-thread freeze on the map | 334 ms | **0 ms** |
 | Noise evaluations per map pixel | 2 | **1** (plus fine texture on land) |
+| Canvas calls per frame for woods and animals, 86 villages on screen | 22,471 | **17** |
+| Script time per frame for the same (`npm run bench:map`) | 2.0 ms | **0.7 ms** |
 
 The climate adds about 6 ms to each EON day's tick with 5 settlements. On the map, JavaScript takes about 100 ms in
 every 5 seconds, or 2% of the main thread. The browser's own drawing is the larger cost: with no GPU, the map runs at

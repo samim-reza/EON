@@ -6,9 +6,9 @@ export const dynamic = "force-dynamic";
 /**
  * Living roster + geography for roster version v. Immutable when the version matches.
  *
- * The land around each village (woods, herds, soil) changes without anyone being born or dying, so
- * the map also names the EON month it is asking in (`m`). That gives the same snapshot a fresh
- * cache key once a month: twelve a real day, however many people are watching.
+ * This is the heavy snapshot, so its key is the roster version alone: it is fetched again only when
+ * someone is born, dies or moves. The land, which changes by itself, has its own small feed at
+ * `/api/pub/land/[m]`. (`m` is still accepted here for map tabs opened before that feed existed.)
  */
 export async function GET(req: Request, ctx: RouteContext<"/api/pub/world/[v]">) {
   const url = new URL(req.url);

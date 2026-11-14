@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "lab": "tsx lab/run.ts",
+    "bench:map": "tsx lab/bench-map.ts",
     "db:reset": "supabase db reset",
     "db:test": "supabase test db"
   },

@@ -127,6 +127,9 @@ export type BuildingTuple = [number, number, string, number, number];
 
 export type Geo = { seed: string; settlements: Settlement[]; buildings: BuildingTuple[] };
 
+/** The land around every village this EON month: `[id, woods, richness, game, beasts, fish, herd, burn]` each. */
+export type LandFeed = { month: number; land: (number | null)[][] };
+
 export type PersonRef = { id: number; name: string; alive?: boolean; birthTick?: number };
 
 export type StoryEntry = {

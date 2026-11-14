@@ -93,13 +93,131 @@ const TAU = Math.PI * 2;
 const MAX_GRAZERS = 36;
 const MAX_HUNTERS = 6;
 const MAX_HERD = 20;
+const HERD_GROUP = 6; // grazers move in groups this size
+const GROUPS = MAX_GRAZERS / HERD_GROUP;
+
+/** Kinds as small numbers, so the map can sort animals into drawing batches without comparing words. */
+export const CREATURE_KINDS = ["grazer", "hunter", "herd", "bird"] as const;
+export const GRAZER = 0, HUNTER = 1, HERD = 2, BIRD = 3;
+
+// Where each number sits in a village's layout.
+const G_ANGLE = 0, G_RADIUS = G_ANGLE + GROUPS, G_TURN = G_RADIUS + GROUPS;
+const G_OFF_X = G_TURN + GROUPS, G_OFF_Y = G_OFF_X + MAX_GRAZERS;
+const H_ANGLE = G_OFF_Y + MAX_GRAZERS, H_RADIUS = H_ANGLE + MAX_HUNTERS;
+const P_X = H_RADIUS + MAX_HUNTERS, P_Y = P_X + 1;
+const F_COS = P_Y + 1, F_SIN = F_COS + MAX_HERD, F_DIST = F_SIN + MAX_HERD, F_HEAD = F_DIST + MAX_HERD;
+const FLOCK = F_HEAD + MAX_HERD;
+const LAYOUT_SIZE = FLOCK + 1;
+
+const layouts = new Map<number, Float64Array>();
 
 /**
- * Where the animals around a village are at this tick. Wild herds graze in small groups that drift
+ * Everything about a village's animals that never changes: which way each group circles, how far
+ * out it grazes, where each animal stands within it. It comes from hashing the village's id, and
+ * it is the same every frame, so it is hashed once and kept. Only the clock is applied per frame.
+ */
+function layoutOf(id: number): Float64Array {
+  let l = layouts.get(id);
+  if (l) return l;
+  l = new Float64Array(LAYOUT_SIZE);
+  for (let g = 0; g < GROUPS; g++) {
+    l[G_ANGLE + g] = TAU * hash01(id * 131 + g, 1);
+    l[G_RADIUS + g] = 20 + 18 * hash01(id * 131 + g, 2);
+    l[G_TURN + g] = hash01(id * 131 + g, 7) < 0.5 ? 1 : -1;
+  }
+  for (let i = 0; i < MAX_GRAZERS; i++) {
+    l[G_OFF_X + i] = 2.4 * Math.cos(TAU * hash01(id * 977 + i, 3));
+    l[G_OFF_Y + i] = 2.4 * Math.sin(TAU * hash01(id * 977 + i, 4));
+  }
+  for (let i = 0; i < MAX_HUNTERS; i++) {
+    l[H_ANGLE + i] = TAU * hash01(id * 313 + i, 5);
+    l[H_RADIUS + i] = 34 + 12 * hash01(id * 313 + i, 6);
+  }
+  const pasture = TAU * hash01(id, 11);
+  l[P_X] = 11 * Math.cos(pasture);
+  l[P_Y] = 11 * Math.sin(pasture);
+  for (let i = 0; i < MAX_HERD; i++) {
+    const a = TAU * hash01(id * 71 + i, 8);
+    l[F_COS + i] = Math.cos(a);
+    l[F_SIN + i] = Math.sin(a);
+    l[F_DIST + i] = Math.sqrt(hash01(id * 71 + i, 9));
+    l[F_HEAD + i] = a;
+  }
+  l[FLOCK] = TAU * hash01(id, 12);
+  if (layouts.size > 4000) layouts.clear(); // a few megabytes at most, even for a world of cities
+  layouts.set(id, l);
+  return l;
+}
+
+/**
+ * Visits every animal around a village at this tick, without building a list: the map calls this
+ * thirty times a second for every village on screen. Wild herds graze in small groups that drift
  * round the village over days; hunters keep their distance and come closer in the dark; the
  * village's own animals stay near the homes and bunch up at night; birds fly by day.
  * `isLand` keeps everything out of the sea.
  */
+export function eachCreature(
+  place: { id: number; x: number; y: number },
+  land: Land,
+  tick: number,
+  daylight: number,
+  isLand: (x: number, y: number) => boolean,
+  visit: (kind: number, x: number, y: number, heading: number) => void,
+): void {
+  const l = layoutOf(place.id);
+
+  const grazers = Math.min(MAX_GRAZERS, Math.round(land.game / 8));
+  for (let g = 0; g * HERD_GROUP < grazers; g++) {
+    const turn = l[G_TURN + g];
+    const angle = l[G_ANGLE + g] + turn * tick * 0.0009;
+    const gx = place.x + l[G_RADIUS + g] * Math.cos(angle);
+    const gy = place.y + l[G_RADIUS + g] * Math.sin(angle);
+    const heading = angle + (turn * Math.PI) / 2;
+    const end = Math.min(grazers, (g + 1) * HERD_GROUP);
+    for (let i = g * HERD_GROUP; i < end; i++) {
+      const wander = tick / 9 + i * 1.7;
+      const x = gx + l[G_OFF_X + i] + 0.5 * Math.sin(wander);
+      const y = gy + l[G_OFF_Y + i] + 0.5 * Math.cos(wander * 0.8);
+      if (isLand(x, y)) visit(GRAZER, x, y, heading);
+    }
+  }
+
+  const hunters = Math.min(MAX_HUNTERS, Math.round(land.beasts));
+  const prowl = 1 - 0.3 * (1 - daylight); // closer at night
+  for (let i = 0; i < hunters; i++) {
+    const angle = l[H_ANGLE + i] - tick * 0.0016;
+    const radius = l[H_RADIUS + i] * prowl;
+    const x = place.x + radius * Math.cos(angle);
+    const y = place.y + radius * Math.sin(angle);
+    if (isLand(x, y)) visit(HUNTER, x, y, angle - Math.PI / 2);
+  }
+
+  const herd = Math.min(MAX_HERD, Math.round(land.herd / 3));
+  const spread = 1.2 + 2.6 * daylight; // out at pasture by day, penned at night
+  for (let i = 0; i < herd; i++) {
+    const d = spread * l[F_DIST + i];
+    const x = place.x + l[P_X] + d * l[F_COS + i] + 0.3 * Math.sin(tick / 11 + i);
+    const y = place.y + l[P_Y] + d * l[F_SIN + i] + 0.3 * Math.cos(tick / 13 + i);
+    if (isLand(x, y)) visit(HERD, x, y, l[F_HEAD + i]);
+  }
+
+  if (daylight > 0.35) {
+    // One flock circling wide over the village.
+    const sweep = tick * 0.02 + l[FLOCK];
+    const cx = place.x + 26 * Math.cos(sweep);
+    const cy = place.y + 16 * Math.sin(sweep * 1.3);
+    const heading = Math.atan2(16 * 1.3 * Math.cos(sweep * 1.3), -26 * Math.sin(sweep));
+    const cos = Math.cos(heading);
+    const sin = Math.sin(heading);
+    for (let i = 0; i < 5; i++) {
+      const back = Math.ceil(i / 2) * 1.1;
+      const side = (i % 2 === 0 ? 1 : -1) * Math.ceil(i / 2) * 0.8;
+      visit(BIRD, cx - back * cos - side * sin, cy - back * sin + side * cos, heading);
+    }
+  }
+}
+
+/** The same animals as a list, for a click or a test. The map's draw loop uses `eachCreature`. */
 export function wildlifeAt(
   place: { id: number; x: number; y: number },
   land: Land,
@@ -108,53 +226,7 @@ export function wildlifeAt(
   isLand: (x: number, y: number) => boolean,
 ): Creature[] {
   const out: Creature[] = [];
-  const add = (kind: Creature["kind"], x: number, y: number, heading: number) => {
-    if (kind === "bird" || isLand(x, y)) out.push({ kind, x, y, heading });
-  };
-
-  const grazers = Math.min(MAX_GRAZERS, Math.round(land.game / 8));
-  for (let i = 0; i < grazers; i++) {
-    const group = Math.floor(i / 6);
-    const turn = hash01(place.id * 131 + group, 7) < 0.5 ? 1 : -1;
-    const angle = TAU * hash01(place.id * 131 + group, 1) + turn * tick * 0.0009;
-    const radius = 20 + 18 * hash01(place.id * 131 + group, 2);
-    const wander = tick / 9 + i * 1.7;
-    add("grazer",
-      place.x + radius * Math.cos(angle) + 2.4 * Math.cos(TAU * hash01(place.id * 977 + i, 3)) + 0.5 * Math.sin(wander),
-      place.y + radius * Math.sin(angle) + 2.4 * Math.sin(TAU * hash01(place.id * 977 + i, 4)) + 0.5 * Math.cos(wander * 0.8),
-      angle + (turn * Math.PI) / 2);
-  }
-
-  const hunters = Math.min(MAX_HUNTERS, Math.round(land.beasts));
-  const prowl = 1 - 0.3 * (1 - daylight); // closer at night
-  for (let i = 0; i < hunters; i++) {
-    const angle = TAU * hash01(place.id * 313 + i, 5) - tick * 0.0016;
-    const radius = (34 + 12 * hash01(place.id * 313 + i, 6)) * prowl;
-    add("hunter", place.x + radius * Math.cos(angle), place.y + radius * Math.sin(angle), angle - Math.PI / 2);
-  }
-
-  const herd = Math.min(MAX_HERD, Math.round(land.herd / 3));
-  const spread = 1.2 + 2.6 * daylight; // out at pasture by day, penned at night
-  const pasture = TAU * hash01(place.id, 11);
-  for (let i = 0; i < herd; i++) {
-    const a = TAU * hash01(place.id * 71 + i, 8);
-    const d = spread * Math.sqrt(hash01(place.id * 71 + i, 9));
-    add("herd", place.x + 11 * Math.cos(pasture) + d * Math.cos(a) + 0.3 * Math.sin(tick / 11 + i),
-      place.y + 11 * Math.sin(pasture) + d * Math.sin(a) + 0.3 * Math.cos(tick / 13 + i), a);
-  }
-
-  if (daylight > 0.35) {
-    // One flock circling wide over the village.
-    const sweep = tick * 0.02 + TAU * hash01(place.id, 12);
-    const cx = place.x + 26 * Math.cos(sweep);
-    const cy = place.y + 16 * Math.sin(sweep * 1.3);
-    const heading = Math.atan2(16 * 1.3 * Math.cos(sweep * 1.3), -26 * Math.sin(sweep));
-    for (let i = 0; i < 5; i++) {
-      const back = Math.ceil(i / 2) * 1.1;
-      const side = (i % 2 === 0 ? 1 : -1) * Math.ceil(i / 2) * 0.8;
-      add("bird", cx - back * Math.cos(heading) - side * Math.sin(heading), cy - back * Math.sin(heading) + side * Math.cos(heading), heading);
-    }
-  }
+  eachCreature(place, land, tick, daylight, isLand, (kind, x, y, heading) => out.push({ kind: CREATURE_KINDS[kind], x, y, heading }));
   return out;
 }
 

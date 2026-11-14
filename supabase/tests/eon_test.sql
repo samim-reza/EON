@@ -2,7 +2,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = extensions, public;
 
-select plan(185);
+select plan(187);
 
 -- Tests never contain the real God email: point the lock at a throwaway address for this
 -- transaction only (everything below is rolled back).
@@ -710,6 +710,12 @@ select ok((select woods > 0.5 from sim.settlements where id = (select settlement
           'planting trees grows them back');                                                                                   -- 184
 select ok((select (e ->> 'burn') is not null from jsonb_array_elements(api.pub_geo() -> 'settlements') e
            where (e ->> 'id')::int = current_setting('test.town')::int), 'the map knows where the woods burned');              -- 185
+
+select is((select count(*)::int from jsonb_array_elements(api.pub_land()) e where jsonb_array_length(e) = 8),
+          (select count(*)::int from sim.settlements where woods is not null), 'the land has a small feed of its own, one row per village'); -- 186
+set local role authenticated;
+select throws_ok('select api.pub_land()', '42501', null, 'which only the server may read');                                    -- 187
+reset role;
 
 select * from finish();
 rollback;

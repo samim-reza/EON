@@ -146,13 +146,36 @@ export function useTick(): number | null {
 let recent: readonly FeedEvent[] = [];
 const recentListeners = new Set<() => void>();
 
-/** The newest events, shared by the feed that fetched them, so the map can show a fire or a flood without asking again. */
+/** When each village last burned or flooded, according to the newest events. */
+export type LandMarks = ReadonlyMap<number, { fire: number; flood: number }>;
+let marks: LandMarks = new Map();
+
+/**
+ * The newest events, shared by the feed that fetched them, so the map can show a fire or a flood
+ * without asking again. An unchanged feed changes nothing: no listener runs and nothing re-renders.
+ * Fires and floods are indexed by village here, once, so the draw loop never searches the list.
+ */
 export function setRecentEvents(next: readonly FeedEvent[]) {
+  if (next.length === recent.length && next[0]?.id === recent[0]?.id) return;
   recent = next;
+  const index = new Map<number, { fire: number; flood: number }>();
+  for (const e of next) {
+    if (e.settlement == null) continue;
+    const kind = e.data.kind;
+    const fire = e.kind === "nature" && kind === "wildfire";
+    const flood = e.kind === "weather" && (kind === "flood" || kind === "surge");
+    if (!fire && !flood) continue;
+    const mark = index.get(e.settlement) ?? { fire: -1, flood: -1 };
+    if (fire) mark.fire = Math.max(mark.fire, e.tick);
+    else mark.flood = Math.max(mark.flood, e.tick);
+    index.set(e.settlement, mark);
+  }
+  marks = index;
   recentListeners.forEach((listener) => listener());
 }
 
 export const recentEvents = () => recent;
+export const landMarks = () => marks;
 
 function subscribeRecent(listener: () => void) {
   recentListeners.add(listener);

@@ -75,6 +75,31 @@ export function computeSites(seed: number, count = 300, minGap = 38): [number, n
   });
 }
 
+/** Anything at or above this height is dry land. */
+export const LAND_LEVEL = 0.02;
+
+/**
+ * Remembers which points of the map are land. Working out a height takes six layers of noise, and
+ * the map asks about the same ground thousands of times a second (is this deer in the sea?), so
+ * each whole map unit is worked out once and then read back from one byte.
+ */
+export function landLookup(elevation: (x: number, y: number) => number): (x: number, y: number) => boolean {
+  const size = WORLD_SIZE + 1;
+  const cells = new Uint8Array(size * size); // 0: not asked yet, 1: land, 2: water
+  return (x, y) => {
+    const ix = Math.round(x);
+    const iy = Math.round(y);
+    if (ix < 0 || iy < 0 || ix >= size || iy >= size) return elevation(x, y) >= LAND_LEVEL;
+    const k = iy * size + ix;
+    let v = cells[k];
+    if (v === 0) {
+      v = elevation(ix, iy) >= LAND_LEVEL ? 1 : 2;
+      cells[k] = v;
+    }
+    return v === 1;
+  };
+}
+
 /** Small deterministic hash → [0,1). */
 export function hash01(a: number, b = 0): number {
   let h = Math.imul(a ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul(b + 0x632be5ab, 0xc2b2ae35);
