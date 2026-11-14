@@ -64,3 +64,17 @@ describe("waking the worker", () => {
     expect(signWake("1800000000", secret)).toBe("d5b2c80c1c291a707f76fed9838f1ab586777f6b1ff08fba3fb26407b7f814e3");
   });
 });
+
+describe("the Whisperer in the world's words", () => {
+  it("may be named as people name it, and by no other name", () => {
+    expect(cleanVoice("Folk in Elysium say the Whisperer was busy that night.")).toBe("Folk in Elysium say the Whisperer was busy that night.");
+    for (const name of ["Iblis", "Shaytan", "Satan", "the devil", "a demon", "the jinn"]) {
+      expect(cleanVoice(`They blamed ${name} for the theft in the village.`), name).toBeNull();
+    }
+  });
+  it("never says what becomes of anyone after death", () => {
+    expect(cleanVoice("She is in heaven now, at peace with everyone she loved.")).toBeNull();
+    expect(cleanVoice("He will burn in hell for what he did to them.")).toBeNull();
+    expect(SYSTEM_PROMPT).toContain("never say what becomes of anyone after death");
+  });
+});

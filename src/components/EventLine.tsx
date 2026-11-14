@@ -35,6 +35,12 @@ const COLORS: Record<string, string> = {
   deed: "text-ink-2",
   nature: "text-life",
   pioneers: "text-life",
+  cheat: "text-sick",
+  slander: "text-sick",
+  repent: "text-god",
+  kindness: "text-love",
+  outcast: "text-god",
+  whisper: "text-ink-2",
 };
 
 const ICONS: Record<string, string> = {
@@ -42,6 +48,7 @@ const ICONS: Record<string, string> = {
   genesis: "☀", founders_arrive: "☀", founder_created: "☀", miracle_heal: "✧", founded: "⌂", became_town: "⌂", became_city: "⌂",
   weather: "☁", harvest: "❧", discovery: "✺", built: "⌂", moved: "→", prayer: "☾", prayer_answered: "✧", spoke: "❝", voice: "✎",
   friends: "♡", quarrel: "✕", fight: "⚔", theft: "⊘", judged: "⚖", reconciled: "✽", work: "⚒", sign: "✧", family_arrives: "⌂", deed: "·", nature: "❦", pioneers: "⌂",
+  cheat: "⊘", slander: "✕", repent: "☾", kindness: "♡", outcast: "☀", whisper: "·",
 };
 
 function A({ id, name }: { id: number | null; name: string | null }) {
@@ -181,6 +188,21 @@ export function describe(e: FeedEvent) {
         : <>{a} moved to {place ?? "a new home"}</>;
     case "nature":
       return <>{natureStory(d, place, a)}</>;
+    case "outcast":
+      return <>Before the first people, The Creator made another being, and it would not honour them. It was cast out, and given until the end of the world. People call it the Whisperer: it can put a thought in a heart, and nothing more</>;
+    case "cheat":
+      return <>{a} was caught giving short measure, and had to make it good</>;
+    case "slander":
+      return <>{a} spread a lie about {o}, and it came out who said it</>;
+    case "repent":
+      return <>{a} asked the Creator&apos;s forgiveness</>;
+    case "kindness":
+      return d.how === "nursed" ? <>{a} sat up through the night with {o}, who was ill</> : <>{a} shared what they had with {o}</>;
+    case "whisper":
+      // Only ever shown to the person it came to, on their own page.
+      return d.did === "yield" ? <>A whisper came to {a}, and {a} listened</>
+        : d.did === "refuge" ? <>A whisper came to {a}, who sought refuge with the Creator</>
+          : <>A whisper came to {a}, who turned away</>;
     case "pioneers":
       return <>{Number(d.families) > 1 ? `${String(d.families)} young families` : "A young family"} left {String(d.from ?? "home")} to settle new land at <span className="text-life">{String(d.name ?? "a new village")}</span></>;
     case "harvest":
@@ -217,6 +239,7 @@ export function describe(e: FeedEvent) {
         love: <>{a} went looking for love</>, give: <>{a} gave to someone in need</>,
         forage: <>{a} went gathering</>, fish: <>{a} went fishing</>, hunt: <>{a} went hunting</>,
         wood: <>{a} cut firewood</>, plant: <>{a} planted trees</>, herd: <>{a} tended the village herd</>,
+        repent: <>{a} asked forgiveness</>,
       };
       return did[String(d.deed)] ?? <>{a} did something</>;
     }

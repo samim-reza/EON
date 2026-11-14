@@ -33,3 +33,27 @@ describe("choices as the player reads them", () => {
     expect(timeLeft(-3)).toBe("now");
   });
 });
+
+describe("a whisper as the player reads it", () => {
+  const whisper: Choice = {
+    id: 9, kind: "whisper", tick: 100, dueTick: 460, status: "open", otherName: "Orin Kell",
+    facts: { what: "take", line: "Take it. Orin has more than enough, and nobody will see." },
+    options: [{ id: "yield", label: "Take it from Orin" }, { id: "resist", label: "Turn away" }, { id: "refuge", label: "Seek refuge with the Creator" }],
+  };
+  it("comes in a voice almost your own", () => {
+    expect(situation(whisper)).toBe('A whisper, in a voice almost your own: "Take it. Orin has more than enough, and nobody will see."');
+  });
+  it("tells you what came of it, and that wrongs go on your record", () => {
+    const after = (result: string, what = "take") => outcome({ ...whisper, status: "settled", facts: { ...whisper.facts, what }, choice: "yield", outcome: { did: "yield", result } });
+    expect(after("took")).toBe("You took from Orin, and nobody saw. It is on your record.");
+    expect(after("caught")).toBe("You took from Orin, and you were caught.");
+    expect(after("caught", "cheat")).toBe("You gave short measure, and you were found out.");
+    expect(after("resisted")).toBe("You turned away.");
+    expect(after("refuge")).toContain("sought refuge with the Creator");
+    expect(after("gone")).toBe("The moment passed.");
+  });
+  it("says who held you back", () => {
+    expect(outcome({ ...whisper, status: "settled", choice: "yield", outcome: { did: "resist", result: "resisted", sway: { want: "resist", role: "mother", won: true } } }))
+      .toBe("You turned away. Your mother pushed you to turn away, and you gave in.");
+  });
+});

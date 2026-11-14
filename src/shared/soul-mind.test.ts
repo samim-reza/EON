@@ -64,3 +64,21 @@ describe("a mind in a living world", () => {
     expect(lifeOf({ me: { name: "Old Soul", age: 40 } }).you.looks).toBeUndefined();
   });
 });
+
+describe("a mind and the Whisperer", () => {
+  it("is told what the whisper said, and knows where such thoughts come from", () => {
+    const prompt = soulPrompt("mind_choice", {
+      me: { name: "Mira Vale", sex: "F", age: 30, conscience: "uneasy" },
+      choice: { kind: "whisper", options: [{ id: "yield", label: "Give short measure" }, { id: "resist", label: "Turn away" }, { id: "refuge", label: "Seek refuge with the Creator" }],
+                details: { what: "cheat", line: "Give a little less than you promised. Who would ever know?" } },
+    });
+    expect(prompt).toContain("Give a little less than you promised");
+    expect(prompt).toContain("You know where such thoughts come from");
+    expect(prompt).toContain("uneasy");
+  });
+  it("can only answer with an option it was offered", () => {
+    const offered = ["yield", "resist", "refuge"];
+    expect(parseSoulReply('{"choice":"refuge","thought":"I will not listen to it."}', offered).choice).toBe("refuge");
+    expect(parseSoulReply('{"choice":"burn the village","thought":"Yes."}', offered).choice).toBeNull();
+  });
+});

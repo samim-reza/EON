@@ -171,6 +171,8 @@ export type AgentDetail = {
   homeId?: number | null;
   /** `[skin, hair, curl, eyes, height, build]`, inherited from the parents. */
   looks?: number[] | null;
+  /** How the dead left the world, once their deeds were weighed. Never set for the living. */
+  reckoning?: "light" | "even" | "heavy" | "child" | null;
   pregnant?: boolean;
   /** When the baby is due, so the wait is visible. */
   dueTick?: number | null;

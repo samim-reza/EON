@@ -7,6 +7,7 @@ import { PersonTools } from "@/components/PersonTools";
 import { LiveActivity, LiveAge, LiveDue } from "@/components/WorldClock";
 import { pub } from "@/lib/pub";
 import { looksOf } from "@/shared/nature";
+import { reckoningLine } from "@/shared/reckoning";
 import { formatAge, formatEonDate } from "@/shared/time";
 import type { AgentDetail, FeedEvent } from "@/shared/types";
 
@@ -97,6 +98,7 @@ export default async function AgentPage(props: PageProps<"/agents/[id]">) {
             )}
           </p>
           {looks && <p className="mt-1 text-sm text-ink-2">{looks}.</p>}
+          {!a.alive && reckoningLine(a.reckoning) && <p className="mt-1 text-sm text-ink-2">{reckoningLine(a.reckoning)}</p>}
           {a.alive && a.settlement?.x != null && a.settlement.y != null && (
             <p className="mt-1 text-sm text-ink-3">
               <LiveActivity

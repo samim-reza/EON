@@ -29,14 +29,15 @@ export default async function GodPage() {
   if (aal?.currentLevel !== "aal2") {
     body = <MfaGate factorId={verified?.id ?? null} />;
   } else {
-    const [{ data, error }, { data: children }, { data: players }] = await Promise.all([
-      supabase.rpc("god_state"), supabase.rpc("god_children"), supabase.rpc("god_players"),
+    // The Whisperer's panel is read separately: before its migration has run, the rest still loads.
+    const [{ data, error }, { data: children }, { data: players }, { data: whisperer }] = await Promise.all([
+      supabase.rpc("god_state"), supabase.rpc("god_children"), supabase.rpc("god_players"), supabase.rpc("god_whisperer"),
     ]);
     body = error ? (
       // Typically: MFA older than 12 h — verify again.
       <MfaGate factorId={verified?.id ?? null} />
     ) : (
-      <GodConsole state={{ ...(data as GodState), children: (children ?? []) as GodState["children"], players: (players ?? []) as GodState["players"] }} />
+      <GodConsole state={{ ...(data as GodState), children: (children ?? []) as GodState["children"], players: (players ?? []) as GodState["players"], whisperer: (whisperer ?? null) as GodState["whisperer"] }} />
     );
   }
 

@@ -2,7 +2,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = extensions, public;
 
-select plan(187);
+select plan(211);
 
 -- Tests never contain the real God email: point the lock at a throwaway address for this
 -- transaction only (everything below is rolled back).
@@ -716,6 +716,91 @@ select is((select count(*)::int from jsonb_array_elements(api.pub_land()) e wher
 set local role authenticated;
 select throws_ok('select api.pub_land()', '42501', null, 'which only the server may read');                                    -- 187
 reset role;
+
+------------------------------------------------------------------------------
+-- The Whisperer, and the reckoning
+------------------------------------------------------------------------------
+select is(sim.weigh(10, 0, 40), 'light', 'a life of kindness weighs light');                                                   -- 188
+select is(sim.weigh(2, 4, 40), 'heavy', 'wrongs that were never repented weigh heavy');                                        -- 189
+select is(sim.weigh(0, 9, 12), 'child', 'nothing is held against a child');                                                    -- 190
+
+select set_config('test.t', (select tick::text from sim.world), true);
+update sim.agents set deeds_good = 0, deeds_ill = 0, deeds_mended = 0, refuge_until = 0, piety = 50, honesty = 50, occupation = 'farmer'
+ where id = current_setting('test.mum')::bigint;
+select is(sim.do_whisper(current_setting('test.t')::int, current_setting('test.mum')::bigint, 'cheat', null, 'resist'), 'resisted',
+          'a whisper can be turned away');                                                                                      -- 191
+select is((select deeds_good from sim.agents where id = current_setting('test.mum')::bigint), 1::smallint, 'and turning away is a good deed'); -- 192
+select ok(sim.do_whisper(current_setting('test.t')::int, current_setting('test.mum')::bigint, 'cheat', null, 'yield') in ('cheated', 'caught'),
+          'or given in to');                                                                                                    -- 193
+select is((select deeds_ill from sim.agents where id = current_setting('test.mum')::bigint), 1::smallint, 'which goes on the record'); -- 194
+select is(sim.do_whisper(current_setting('test.t')::int, current_setting('test.mum')::bigint, 'idle', null, 'refuge'), 'refuge',
+          'anyone can seek refuge with the Creator');                                                                           -- 195
+select ok((select refuge_until > current_setting('test.t')::int from sim.agents where id = current_setting('test.mum')::bigint),
+          'and then the Whisperer keeps away for a while');                                                                     -- 196
+select is(sim.repent(current_setting('test.t')::int, current_setting('test.mum')::bigint), 1, 'repentance lays the ill down');  -- 197
+select ok((select deeds_ill = 0 and deeds_mended = 1 from sim.agents where id = current_setting('test.mum')::bigint),
+          'and it no longer weighs');                                                                                           -- 198
+
+-- God decides how loud the Whisperer is.
+select set_config('test.e0', (select coalesce(max(id), 0)::text from sim.events), true);
+update sim.world set whisper_mult = 0;
+select sim.p_whispers(w.tick + g) from sim.world w, generate_series(0, 119) g;
+select is((select count(*)::int from sim.events where kind = 'whisper' and id > current_setting('test.e0')::bigint), 0,
+          'with its voice taken away, the Whisperer is silent');                                                                -- 199
+update sim.world set whisper_mult = 3, crime_mult = 0; -- loud, but nobody dies of a blow while the tests need them
+update sim.agents set refuge_until = 0;
+select sim.p_whispers(w.tick + g) from sim.world w, generate_series(0, 1199) g;
+select ok((select count(*) > 0 from sim.events where kind = 'whisper' and id > current_setting('test.e0')::bigint),
+          'and when it speaks, people hear it');                                                                                -- 200
+select is((select count(*)::int from sim.agents a, sim.world w
+           where w.tick - a.birth_tick < sim.age_of_reckoning() and (a.deeds_good > 0 or a.deeds_ill > 0)), 0, 'no child is held to account'); -- 201
+update sim.world set whisper_mult = 1, crime_mult = 1;
+
+-- A person with a mind of their own hears the whisper, and decides.
+select set_config('test.wc', sim.offer(current_setting('test.t')::int, current_setting('test.me')::bigint, 'whisper',
+  jsonb_build_array(sim.opt('yield', 'Give short measure'), sim.opt('resist', 'Turn away'), sim.opt('refuge', 'Seek refuge with the Creator')),
+  'yield', '{"what": "cheat", "line": "Give a little less than you promised."}')::text, true);
+select set_config('request.jwt.claims', json_build_object('sub', '88888888-8888-8888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal1')::text, true);
+set local role authenticated;
+select lives_ok($$select api.choose(current_setting('test.wc')::bigint, 'refuge')$$, 'a player answers the whisper themselves'); -- 202
+reset role;
+select sim.p_choices(current_setting('test.t')::int);
+select is((select outcome ->> 'result' from app.choices where id = current_setting('test.wc')::bigint), 'refuge',
+          'and what they chose is what happens');                                                                               -- 203
+
+-- Love between two villages, for someone with a mind of their own.
+select set_config('test.far', sim.spawn_agent(current_setting('test.t')::int, 'Rowan', 'Dale',
+  (select case when sex = 'F' then 'M' else 'F' end from sim.agents where id = current_setting('test.me')::bigint)::char,
+  current_setting('test.t')::int - 21 * 1440, null, null, '{}', 0::smallint, false, current_setting('test.town')::int, null, sim.random_traits(907), 0)::text, true);
+select sim.court(current_setting('test.t')::int, current_setting('test.me')::bigint, current_setting('test.far')::bigint);
+select set_config('test.lc', (select max(id)::text from app.choices where agent_id = current_setting('test.me')::bigint and kind = 'love'), true);
+set local role authenticated;
+select api.choose(current_setting('test.lc')::bigint, 'accept');
+reset role;
+select sim.p_choices(current_setting('test.t')::int);
+select ok((select outcome ->> 'result' in ('together', 'apart') from app.choices where id = current_setting('test.lc')::bigint),
+          'a courtship from another village is not lost for the distance');                                                     -- 204
+
+-- The record goes with a person to the end.
+update sim.agents set deeds_good = 12, deeds_ill = 1 where id = current_setting('test.dad')::bigint;
+select sim.kill(current_setting('test.t')::int, current_setting('test.dad')::bigint, 'Accident');
+select is((select deeds_good::int from sim.dead where id = current_setting('test.dad')::bigint), 12, 'the record goes with a person when they die'); -- 205
+select is(api.pub_agent(current_setting('test.dad')::bigint) ->> 'reckoning', 'light', 'and their page says how they left the world'); -- 206
+select ok((api.pub_agent(current_setting('test.mum')::bigint) ->> 'reckoning') is null, 'a living person''s record stays between them and the Creator'); -- 207
+
+select set_config('request.jwt.claims', json_build_object('sub', '11111111-1111-1111-1111-111111111111', 'role', 'authenticated',
+  'aal', 'aal2', 'amr', json_build_array(json_build_object('method', 'totp', 'timestamp', extract(epoch from now())::bigint)))::text, true);
+set local role authenticated;
+select lives_ok($$select api.god_set_world('{"whisper_mult": 2}')$$, 'God sets how loud the Whisperer is');                     -- 208
+select is((api.god_whisperer() ->> 'mult')::real, 2::real, 'and sees what it has been doing');                                  -- 209
+reset role;
+select set_config('request.jwt.claims', json_build_object('sub', '88888888-8888-8888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal1')::text, true);
+set local role authenticated;
+select throws_ok('select api.god_whisperer()', '42501', 'Only God may do this', 'which no player can');                        -- 210
+reset role;
+select sim.tell_of_the_outcast();
+select sim.tell_of_the_outcast();
+select is((select count(*)::int from sim.chronicle where kind = 'outcast'), 1, 'the story of the outcast is told once, at the beginning'); -- 211
 
 select * from finish();
 rollback;

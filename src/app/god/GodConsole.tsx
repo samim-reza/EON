@@ -14,6 +14,8 @@ export type GodState = {
     capacity_k: number; fertility_mult: number; mortality_mult: number; disease_mult: number; crime_mult: number;
     temp_shift: number; rain_mult: number; llm_cap?: number;
     female_ratio: number; autopilot: boolean;
+    /** How loud the Whisperer is: 0 silences it. Absent until the Whisperer migration has run. */
+    whisper_mult?: number;
   };
   population: number;
   dead: number;
@@ -41,12 +43,22 @@ export type GodState = {
     mind: "world" | "own" | "none" | null; person: string | null; age: number | null; place: string | null; key: string | null;
   }[];
   ai?: { spent: number; lines: number; cap: number; waiting: number };
+  /** What the Whisperer has been doing in the past EON year, and whose records weigh most. */
+  whisperer?: {
+    mult: number; whispers: number; yielded: number; refuge: number; repented: number; kindness: number; waiting: number;
+    by: Record<string, number>;
+    heaviest: { id: number; name: string; good: number; ill: number; mended: number }[];
+    lightest: { id: number; name: string; good: number; ill: number; mended: number }[];
+  } | null;
   pyramid: { band: number; F: number; M: number }[];
   dbBytes: number;
   audit: { id: number; at: string; actor: string; action: string; target: string | null; tick: number; hash: string }[];
 };
 
 const init: ActionResult = { ok: false, error: null };
+
+/** What the Whisperer suggests, in a word. */
+const WHISPERS: Record<string, string> = { take: "theft", cheat: "short measure", slander: "lies", strike: "blows", idle: "idleness", forsake: "leaving prayer" };
 
 type Found = { id: number; name: string; sex: "F" | "M"; age: number; work: string; place: string | null; health: number; controller: string; player: string | null };
 
@@ -210,7 +222,7 @@ export function GodConsole({ state }: { state: GodState }) {
       </div>
 
       <nav className="sticky top-14 z-30 -mx-1 flex flex-wrap gap-1 rounded-lg bg-bg/85 px-1 py-1 text-sm backdrop-blur">
-        {[["players", "Players"], ["souls", "Prayers & souls"], ["world", "The world"], ["powers", "Powers"], ["audit", "Audit"]].map(([id, label]) => (
+        {[["players", "Players"], ["souls", "Prayers & souls"], ["world", "The world"], ["whisperer", "The Whisperer"], ["powers", "Powers"], ["audit", "Audit"]].map(([id, label]) => (
           <a key={id} href={`#${id}`} className="tag hover:text-ink">{label}</a>
         ))}
       </nav>
@@ -433,6 +445,7 @@ export function GodConsole({ state }: { state: GodState }) {
           <Slider name="mortality_mult" label="Mortality" value={w.mortality_mult} min={0.2} max={5} step={0.05} hint="redraws every fate" />
           <Slider name="disease_mult" label="Disease" value={w.disease_mult} min={0} max={5} step={0.05} hint="outbreaks & spread" />
           <Slider name="crime_mult" label="Quarrels & crime" value={w.crime_mult} min={0} max={5} step={0.05} hint="1 = natural, 0 = perfect peace" />
+          <Slider name="whisper_mult" label="The Whisperer's voice" value={w.whisper_mult ?? 1} min={0} max={3} step={0.05} hint="1 = as it was allowed, 0 = silenced" />
           <Slider name="temp_shift" label="World temperature" value={w.temp_shift} min={-20} max={20} step={0.5} hint="°C added everywhere: 0 = natural" />
           <Slider name="rain_mult" label="Rainfall" value={w.rain_mult} min={0} max={4} step={0.05} hint="1 = natural, 0 = endless drought" />
           <Slider name="llm_cap" label="AI budget per day, $" value={w.llm_cap ?? 0.5} min={0} max={5} step={0.05} hint="0 turns the AI off" />
@@ -446,6 +459,64 @@ export function GodConsole({ state }: { state: GodState }) {
             {balancing ? "Rebalancing…" : "Apply"}
           </button>
         </form>
+      </div>
+
+      <div id="whisperer" className="panel scroll-mt-20 p-5">
+        <h2 className="font-semibold">The Whisperer</h2>
+        <p className="text-xs text-ink-3">
+          The outcast you allowed until the end of the world. It can only whisper: each person gives in, turns away, or seeks
+          refuge with you. Its voice is set under The world. People&apos;s records are yours alone to see while they live.
+        </p>
+        {!state.whisperer ? (
+          <p className="mt-3 text-sm text-ink-3">Nothing to show yet.</p>
+        ) : (
+          <>
+            <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-3">
+              {([
+                ["Whispers this past year", state.whisperer.whispers],
+                ["Gave in", state.whisperer.yielded],
+                ["Turned away", state.whisperer.whispers - state.whisperer.yielded - state.whisperer.refuge],
+                ["Sought refuge with you", state.whisperer.refuge],
+                ["Asked forgiveness", state.whisperer.repented],
+                ["Kindnesses done", state.whisperer.kindness],
+                ["Players still deciding", state.whisperer.waiting],
+              ] as [string, number][]).map(([label, n]) => (
+                <div key={label} className="flex justify-between gap-3">
+                  <dt className="text-ink-2">{label}</dt>
+                  <dd className="tabular-nums text-ink">{n}</dd>
+                </div>
+              ))}
+            </dl>
+            {Object.keys(state.whisperer.by).length > 0 && (
+              <p className="mt-2 text-xs text-ink-3">
+                What people gave in to:{" "}
+                {Object.entries(state.whisperer.by).sort((a, b) => b[1] - a[1]).map(([what, n]) => `${WHISPERS[what] ?? what} ${n}`).join(" · ")}
+              </p>
+            )}
+            <div className="mt-4 grid gap-6 sm:grid-cols-2">
+              {([["The heaviest records", state.whisperer.heaviest], ["The lightest records", state.whisperer.lightest]] as const).map(([title, list]) => (
+                <div key={title}>
+                  <h3 className="text-xs uppercase tracking-widest text-ink-3">{title}</h3>
+                  {list.length === 0 ? (
+                    <p className="mt-1 text-sm text-ink-3">Nobody yet.</p>
+                  ) : (
+                    <ul className="mt-1 space-y-0.5 text-sm">
+                      {list.map((r) => (
+                        <li key={r.id} className="flex justify-between gap-3">
+                          <a href={`/agents/${r.id}`} className="text-ink hover:text-life hover:underline">{r.name}</a>
+                          <span className="tabular-nums text-ink-3">
+                            {r.good} good · <span className={r.ill > 0 ? "text-sick" : ""}>{r.ill} ill</span>
+                            {r.mended > 0 ? ` · ${r.mended} forgiven` : ""}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
       <div id="powers" className="scroll-mt-20 grid gap-6 lg:grid-cols-3">

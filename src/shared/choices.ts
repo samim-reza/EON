@@ -6,7 +6,7 @@ export type ChoiceOption = { id: string; label: string };
 export type Sway = { want: string; who?: number | null; name?: string | null; role: string; won: boolean };
 export type Choice = {
   id: number;
-  kind: "year" | "work" | "love" | "wed" | "child" | "quarrel" | "tempt" | "sign";
+  kind: "year" | "work" | "love" | "wed" | "child" | "quarrel" | "tempt" | "sign" | "whisper";
   tick: number;
   dueTick: number;
   options: ChoiceOption[];
@@ -34,6 +34,25 @@ export function situation(c: Choice): string {
     case "quarrel": return `You fell out with ${o}${typeof c.facts.about === "string" ? ` over ${c.facts.about}` : ""}. What will you do?`;
     case "tempt": return `You are poor, and ${o} has plenty.`;
     case "sign": return `A dream that will not leave you: "${typeof c.facts.text === "string" ? c.facts.text : ""}"`;
+    case "whisper": return `A whisper, in a voice almost your own: "${typeof c.facts.line === "string" ? c.facts.line : "Go on."}"`;
+  }
+}
+
+/** What came of a whisper, told to the person it came to. */
+function whisperOutcome(c: Choice, o: string): string {
+  const what = typeof c.facts.what === "string" ? c.facts.what : "";
+  switch (c.outcome?.result) {
+    case "refuge": return "You sought refuge with the Creator, and the whisper fell silent. It will keep away for a while.";
+    case "resisted": return "You turned away.";
+    case "took": return `You took from ${o}, and nobody saw. It is on your record.`;
+    case "cheated": return "You gave short measure, and nobody noticed. It is on your record.";
+    case "caught": return what === "cheat" ? "You gave short measure, and you were found out." : `You took from ${o}, and you were caught.`;
+    case "slandered": return `You spread a lie about ${o}. It is on your record.`;
+    case "found": return `You spread a lie about ${o}, and it came out who said it.`;
+    case "struck": return `You struck ${o}. It is on your record.`;
+    case "idled": return "You left the work to the others. It is on your record.";
+    case "forsook": return "You stopped praying for a while, and felt further from everything.";
+    default: return "The moment passed.";
   }
 }
 
@@ -82,6 +101,9 @@ export function outcome(c: Choice): string {
       break;
     case "sign":
       line = did === "heed" ? "You took it to heart." : "You put it out of your mind.";
+      break;
+    case "whisper":
+      line = whisperOutcome(c, o);
       break;
   }
   const sway = swayLine(c);

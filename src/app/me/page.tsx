@@ -6,6 +6,7 @@ import { getMe } from "@/lib/auth";
 import { createUserClient } from "@/lib/supabase/server";
 import { BY, outcome, timeLeft } from "@/shared/choices";
 import { PROVIDERS } from "@/shared/providers";
+import { reckoningLine, recordLine } from "@/shared/reckoning";
 import { stageOf } from "@/shared/soul-mind";
 import { formatEonDate } from "@/shared/time";
 import { ChoiceCard } from "./ChoiceCard";
@@ -122,6 +123,13 @@ function Living({ life }: { life: Life }) {
           {p.calling ? ` · learned to be a ${p.calling}` : ""}
         </p>
         {kin.length > 0 && <p className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-sm text-ink-2">{kin}</p>}
+        {p.record && (
+          <p className="mt-2 text-sm text-ink-2">
+            <span className="text-ink-3">Your record: </span>
+            <span className={p.record.ill > 0 ? "text-sick" : "text-ink"}>{recordLine(p.record)}</span>
+            {p.refuge && p.refuge > life.tick ? <span className="text-god"> · the Whisperer is keeping away</span> : null}
+          </p>
+        )}
         <Mind life={life} />
         <Next life={life} age={age} />
         <div className="mt-4 flex flex-wrap gap-2">
@@ -142,7 +150,7 @@ function Living({ life }: { life: Life }) {
         {open.length === 0 ? (
           <p className="mt-1 text-sm text-ink-3">
             Nothing to decide right now. While {name} grows up there is one choice a year (one a real day); later, work, love,
-            children, quarrels and temptation.
+            children, quarrels, temptation, and the Whisperer.
           </p>
         ) : (
           <div className="mt-3 space-y-3">
@@ -255,7 +263,7 @@ export default async function MePage() {
         <>
           <p className="mt-2 text-ink-2">
             {status === "ended"
-              ? `${life.name ?? "Your last life"} has ended. You can ask for another.`
+              ? `${life.name ?? "Your last life"} has ended. ${reckoningLine(life.reckoning) ?? ""} You can ask for another.`
               : "Ask for a life. Everyone in EON is born to a mother and a father. If a child under three has no soul yet, you become them at once; otherwise you wait for the next baby."}
           </p>
           <p className="mt-2 text-sm text-ink-3">

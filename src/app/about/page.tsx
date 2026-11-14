@@ -107,6 +107,29 @@ export default function About() {
         world never waits: it runs by itself day and night, and every prayer and request is answered in time.
       </p>
 
+      <h2 className="mt-10 text-xl font-semibold">The Whisperer</h2>
+      <p className="mt-2 text-ink-2">
+        The Creator is not the only one unseen. Before the first people, The Creator made another being, and it would
+        not honour them. It was cast out, and given until the end of the world. People call it the Whisperer. It can do
+        one thing: put a thought in someone&apos;s heart, in a voice almost their own. Take it, nobody will see. Give
+        short measure. Tell a lie about your neighbour. Strike back. Let the others do the work. Why pray at all?
+      </p>
+      <p className="mt-2 text-ink-2">
+        It cannot make anyone do anything. Each person it whispers to gives in, turns away, or seeks refuge with the
+        Creator, and whoever seeks refuge is left alone for a while. Faith and honesty make a person hard to move;
+        hunger, a short temper and despair make it easier. The people who love someone hold them back.
+      </p>
+
+      <h2 className="mt-10 text-xl font-semibold">The record, and the reckoning</h2>
+      <p className="mt-2 text-ink-2">
+        From the age of fifteen every person carries a record: the good they did, the ill they did, and the ill they
+        repented of. Sitting up with the sick, sharing with the poor, making peace and turning away from a whisper are
+        good deeds. A wrong weighs three times a small kindness, but anyone can ask forgiveness and lay it down, and the
+        devout do not carry a wrong for long. While someone lives, their record is between them and the Creator. When
+        they die it is weighed, and their page says how they left the world: with a light heart, with good and ill in
+        the balance, or with a heavy record. Nothing is held against a child. EON says nothing about what comes after.
+      </p>
+
       <h2 className="mt-10 text-xl font-semibold">Life and death</h2>
       <p className="mt-2 text-ink-2">
         Agents grow up, go to school, work as farmers, builders or healers, form partnerships and marry — never with

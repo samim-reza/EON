@@ -57,7 +57,7 @@ EON combines four things:
 | **Artificial life** | Every person has a personality and looks inherited from their parents, a family tree, a body that ages, and a fate they cannot see. |
 | **A living land** | Woods that are cut and grow back, soil that tires and is renewed, wild herds and the animals that hunt them, fish, birds, fire and flood. |
 | **An AI social network** | People write diaries, pray, mourn and pass on the news, in their own words. The live feed is the world's newspaper. |
-| **A game of free will** | Anyone can ask for a life and be born into a real family. The choices are yours; the person's mind is an AI; the world, and its God, push back. |
+| **A game of free will** | Anyone can ask for a life and be born into a real family. The choices are yours; the person's mind is an AI; the world, its God and its Whisperer push back. |
 
 The world began with **two people**, made by The Creator, who made a few more couples in the first ten EON years so
 the bloodlines would not run dry. **Then the making stopped.** Since then nobody is made: every person is born to a
@@ -173,6 +173,27 @@ come to blows, and very rarely a fight is the end of someone. The poor and the d
 most; small villages see everything, so most thieves are caught and judged by the elders, and later by a court.
 Grudges fade, people who carry one pray for peace, and the easy-going make it.
 
+### The Whisperer, and the reckoning
+
+The Creator is not the only one unseen. Before the first people the Creator made another being, and it would not
+honour them. It was cast out and given until the end of the world. People call it **the Whisperer**. It can do one
+thing: put a thought in someone's heart, in a voice almost their own. *Take it, nobody will see. Give short measure.
+Tell a lie about your neighbour. Strike back. Let the others do the work. Why pray at all?*
+
+- **It cannot make anyone do anything.** Each person it whispers to gives in, turns away, or seeks refuge with the
+  Creator, and whoever seeks refuge is left alone for two years. Faith and honesty make a person hard to move; hunger,
+  a short temper and despair make it easier, and the people who love someone hold them back. A player hears the whisper
+  as a choice, in fixed words that no other player wrote.
+- **Every person carries a record** from the age of fifteen: good deeds (sitting up with the sick, sharing, making
+  peace, turning away from a whisper), ill deeds, and ill deeds repented of. A wrong weighs three times a small
+  kindness. Anyone can ask forgiveness and lay it down, and the devout do not carry a wrong for long.
+- **The record is weighed at death.** While someone lives it is between them and the Creator. When they die, their
+  page says how they left the world: with a light heart, with good and ill in the balance, or with a heavy record.
+  Nothing is held against a child, and EON says nothing about what comes after.
+
+The story is inspired by an old one, and told in EON's own words: no real religion, scripture or name appears, and
+the AI is not allowed to use any.
+
 ### Work and places
 
 Babies become children, children become teens, and adults work as **farmers, builders or healers**, earning
@@ -257,7 +278,8 @@ Visitors can see what is happening now and everything that came before, with no 
 EON has one God, known in the world as **The Creator**. The Creator made the first people and then stopped making
 them. The Creator still decides where every soul is born and when every life ends, hears prayers, can overrule any
 choice a person makes, sends dreams and signs, can work through anyone, performs miracles, and has a hand on the
-land: rain, fire, locusts, or a blessing on the soil and the herds.
+land: rain, fire, locusts, or a blessing on the soil and the herds. The Creator also decides how loud the Whisperer
+is allowed to be, and alone can see a living person's record.
 
 The world never waits. It runs by itself day and night: prayers are answered in time, every soul is born in its
 turn, and choices left open are made by the person's own mind, whether or not The Creator is watching.
@@ -442,7 +464,7 @@ Copy `.env.example` to `.env.local`. Never commit real values.
 npm run lint && npm run typecheck
 npm test                      # Vitest: life table, fertility, calendar, climate, nature, key sealing, providers, a soul's mind, choices, emails
 npm run lab -- 10 300         # 10 worlds × 300 EON years, with pass/fail checks
-npx supabase test db          # pgTAP on a fresh database: 187 checks of the security model, engine, sign-up, souls, choices, keys, deeds and the living world
+npx supabase test db          # pgTAP on a fresh database: 211 checks of the security model, engine, sign-up, souls, choices, keys, deeds, the living world and the Whisperer
 ```
 
 The lab asserts that worlds survive, life expectancy stays near 60, under-5 deaths stay around 3 %, no close-kin union
