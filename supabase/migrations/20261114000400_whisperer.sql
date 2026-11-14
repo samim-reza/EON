@@ -168,6 +168,8 @@ begin
 end $$;
 
 -- What follows a whisper. `p_did` is 'yield', 'resist' or 'refuge'. Returns what came of it.
+-- The whisper itself is recorded for the person it came to and nobody else: not even the one it
+-- was about may see it, so the private event names no other person.
 create or replace function sim.do_whisper(p_tick integer, p_agent bigint, p_what text, p_other bigint, p_did text) returns text
 language plpgsql security definer set search_path = '' as $$
 declare
@@ -187,7 +189,7 @@ begin
       deeds_good = least(30000, deeds_good + 1),
       refuge_until = case when p_did = 'refuge' then p_tick + 2 * 1440 else refuge_until end
     where id = me.id;
-    perform sim.log(p_tick, 'whisper', 0::smallint, me.id, p_other, me.settlement_id,
+    perform sim.log(p_tick, 'whisper', 0::smallint, me.id, null, me.settlement_id,
                     jsonb_build_object('what', p_what, 'did', case when p_did = 'refuge' then 'refuge' else 'resist' end));
     return case when p_did = 'refuge' then 'refuge' else 'resisted' end;
   end if;
@@ -257,7 +259,7 @@ begin
            happiness = case when honesty >= 50 then greatest(0, happiness - 4) else happiness end
      where id = me.id;
   end if;
-  perform sim.log(p_tick, 'whisper', 0::smallint, me.id, p_other, me.settlement_id,
+  perform sim.log(p_tick, 'whisper', 0::smallint, me.id, null, me.settlement_id,
                   jsonb_build_object('what', p_what, 'did', 'yield', 'result', res));
   return res;
 end $$;

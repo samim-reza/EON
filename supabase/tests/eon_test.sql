@@ -2,7 +2,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = extensions, public;
 
-select plan(211);
+select plan(212);
 
 -- Tests never contain the real God email: point the lock at a throwaway address for this
 -- transaction only (everything below is rolled back).
@@ -801,6 +801,9 @@ reset role;
 select sim.tell_of_the_outcast();
 select sim.tell_of_the_outcast();
 select is((select count(*)::int from sim.chronicle where kind = 'outcast'), 1, 'the story of the outcast is told once, at the beginning'); -- 211
+
+select is((select count(*)::int from sim.events where kind = 'whisper' and (other_id is not null or importance > 0)), 0,
+          'a whisper is known only to the one it came to: never public, and never shown to the person it was about');            -- 212
 
 select * from finish();
 rollback;

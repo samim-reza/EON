@@ -464,7 +464,7 @@ Copy `.env.example` to `.env.local`. Never commit real values.
 npm run lint && npm run typecheck
 npm test                      # Vitest: life table, fertility, calendar, climate, nature, key sealing, providers, a soul's mind, choices, emails
 npm run lab -- 10 300         # 10 worlds × 300 EON years, with pass/fail checks
-npx supabase test db          # pgTAP on a fresh database: 211 checks of the security model, engine, sign-up, souls, choices, keys, deeds, the living world and the Whisperer
+npx supabase test db          # pgTAP on a fresh database: 212 checks of the security model, engine, sign-up, souls, choices, keys, deeds, the living world and the Whisperer
 ```
 
 The lab asserts that worlds survive, life expectancy stays near 60, under-5 deaths stay around 3 %, no close-kin union
