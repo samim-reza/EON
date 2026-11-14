@@ -38,8 +38,10 @@ function Shell({ title, sub, onClose, children }: { title: string; sub?: React.R
   );
 }
 
-const country = (s: Settlement) =>
-  `${s.biome ? BIOME_NAMES[s.biome as Biome] ?? s.biome : "Open country"}${s.river ? ", by a river" : ""}${s.coast ? ", on the coast" : ""}`;
+const country = (s: Settlement) => {
+  const name = s.biome ? BIOME_NAMES[s.biome as Biome] ?? s.biome : "open country";
+  return `${name.charAt(0).toUpperCase()}${name.slice(1)}${s.river ? ", by a river" : ""}${s.coast ? ", on the coast" : ""}`;
+};
 
 /** A village: who lives there, its weather, its stores, its country, and what happened lately. */
 export function VillageCard({ place, weather, events, onGo, onClose }: {
