@@ -205,12 +205,16 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
   const [note, setNote] = useState<string | null>(null);
 
   // --- data -------------------------------------------------------------------
-  const requestedVersion = useRef<number>(-1);
+  // People change the snapshot (the roster version); the land changes it slowly, so it is also asked for once an EON month.
+  const requestedVersion = useRef("");
   useEffect(() => {
-    if (!now?.genesis || now.rosterVersion === requestedVersion.current) return;
+    if (!now?.genesis) return;
     const version = now.rosterVersion;
-    requestedVersion.current = version;
-    fetch(`/api/pub/world/${version}`)
+    const month = Math.floor(now.tick / 120);
+    const key = `${version}?m=${month}`;
+    if (key === requestedVersion.current) return;
+    requestedVersion.current = key;
+    fetch(`/api/pub/world/${key}`)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
       .then((data: { roster: Roster; geo: Geo }) => {
         setGeo(data.geo);
@@ -218,7 +222,7 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
         setLoadFailed(false);
       })
       .catch(() => {
-        requestedVersion.current = -1; // try again on the next poll
+        requestedVersion.current = ""; // try again on the next poll
         setLoadFailed(true);
       });
   }, [now]);
