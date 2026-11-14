@@ -1,7 +1,8 @@
 /**
  * EON demography lab — month-granularity Monte Carlo of the same rules the
  * Postgres engine uses (fate-at-birth mortality, kin-blocked partnering,
- * age-banded conception, Genesis founder couples, capacity-damped family size).
+ * age-banded conception, founder couples while the Creator still makes people, capacity-damped
+ * family size). After the years of creation the world is closed: everyone is born.
  */
 import {
   DEMOGRAPHY as P,
@@ -59,6 +60,7 @@ export function runLab(seed: number, years = 300, K: number = P.capacity.default
   const popByDecade: number[] = [];
   const fert = P.fertility;
   const genesisMonths = P.genesis.years * 12;
+  const creationMonths = P.genesis.creationYears * 12;
 
   const makeAdult = (sex: "F" | "M", birth: number, nowMonth: number): Agent => {
     const ageM = nowMonth - birth;
@@ -76,8 +78,8 @@ export function runLab(seed: number, years = 300, K: number = P.capacity.default
 
   const totalMonths = years * 12;
   for (let m = 0; m <= totalMonths; m++) {
-    // Genesis: one unrelated founder couple per EON year (the first at month 0 is God's Adam & Eve equivalent).
-    if (m < genesisMonths && m % 12 === 0) {
+    // Creation: one unrelated founder couple per EON year, the first at month 0. Then no one is made again.
+    if (m < creationMonths && m % 12 === 0) {
       for (let c = 0; c < P.genesis.foundersCouplesPerYear; c++) {
         const span = P.genesis.founderAgeMax - P.genesis.founderAgeMin;
         const ageF = (P.genesis.founderAgeMin + rand() * span) * 12;

@@ -4,11 +4,13 @@ import Link from "next/link";
 import { useActionState, useTransition } from "react";
 import { formatEonDate } from "@/shared/time";
 import { BIOME_NAMES, type Biome } from "@/shared/climate";
-import { answerPrayer, assignSoul, changePassword, createFounder, findPeople, foundSettlement, genesis, heal, moveAgent, overrule, playerAction, possess, release, sendSign, setPaused, setWorld, smite, type ActionResult } from "./actions";
+import { answerPrayer, assignSoul, changePassword, createFounder, findPeople, foundSettlement, genesis, heal, moveAgent, nature, overrule, playerAction, possess, release, sendSign, setPaused, setWorld, smite, type ActionResult } from "./actions";
 
 export type GodState = {
   world: {
     tick: number; paused: boolean; genesis_at: string | null; seed: string; last_tick_ms: number; genesis_end_tick: number;
+    /** After this tick nobody is made: everyone is born. Absent until the living-world migration has run. */
+    creation_end_tick?: number;
     capacity_k: number; fertility_mult: number; mortality_mult: number; disease_mult: number; crime_mult: number;
     temp_shift: number; rain_mult: number; llm_cap?: number;
     female_ratio: number; autopilot: boolean;
@@ -140,6 +142,8 @@ export function GodConsole({ state }: { state: GodState }) {
   const [smitten, smiteAction, smiting] = useActionState(smite, init);
   const [founder, founderAction, founding] = useActionState(createFounder, init);
   const [settled, settleAction, settling] = useActionState(foundSettlement, init);
+  const [land, landAction, landing] = useActionState(nature, init);
+  const creationOver = w.creation_end_tick !== undefined && w.tick >= w.creation_end_tick;
   const [moved, moveAction, moving] = useActionState(moveAgent, init);
   const [answered, answerAction, answering] = useActionState(answerPrayer, init);
   const [placed, placeAction, placing] = useActionState(assignSoul, init);
@@ -191,6 +195,11 @@ export function GodConsole({ state }: { state: GodState }) {
         <span className={`tag ${w.tick < w.genesis_end_tick ? "text-god" : ""}`}>
           {w.tick < w.genesis_end_tick ? `Genesis era until ${formatEonDate(w.genesis_end_tick)}` : "Genesis era over"}
         </span>
+        {w.creation_end_tick !== undefined && (
+          <span className={`tag ${creationOver ? "" : "text-god"}`}>
+            {creationOver ? "Creation is over: everyone is born" : `People are made until ${formatEonDate(w.creation_end_tick)}`}
+          </span>
+        )}
         <button
           className={`btn ${w.paused ? "btn-life" : "btn-ghost"} ml-auto`}
           disabled={pausing}
@@ -430,7 +439,7 @@ export function GodConsole({ state }: { state: GodState }) {
           <Slider name="female_ratio" label="Share of girls at birth" value={w.female_ratio} min={0.3} max={0.7} step={0.01} hint="0.5 = even" />
           <Slider name="capacity_k" label="Land capacity (K)" value={w.capacity_k} min={50} max={200000} step={50} hint="population settles ≈ 1.7 × K" />
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" name="autopilot" defaultChecked={w.autopilot} /> Autopilot (sends founders during Genesis, acts when you are away)
+            <input type="checkbox" name="autopilot" defaultChecked={w.autopilot} /> Autopilot (sends founders during the years of creation, acts when you are away)
           </label>
           <Result s={balance} />
           <button className="btn btn-god w-full" disabled={balancing}>
@@ -460,6 +469,19 @@ export function GodConsole({ state }: { state: GodState }) {
           <Result s={smitten} />
           <button className="btn btn-ghost w-full text-death" disabled={smiting}>Take this life</button>
         </form>
+        {creationOver ? (
+          <div className="panel space-y-3 p-5">
+            <h2 className="font-semibold">Create a founder</h2>
+            <p className="text-sm text-ink-2">
+              The first people have been made. Nobody is made any more: every person is born to a mother and a father,
+              and a waiting soul waits for a baby.
+            </p>
+            <p className="text-xs text-ink-3">
+              The world renews itself now. People marry into other villages, and crowded villages send young families
+              out to settle new land. Your hand is on souls, prayers, fate and the land.
+            </p>
+          </div>
+        ) : (
         <form action={founderAction} className="panel space-y-3 p-5">
           <h2 className="font-semibold">Create a founder</h2>
           <div className="grid grid-cols-2 gap-2">
@@ -479,9 +501,28 @@ export function GodConsole({ state }: { state: GodState }) {
           <Result s={founder} />
           <button className="btn btn-god w-full" disabled={founding}>Create</button>
         </form>
+        )}
+        <form action={landAction} className="panel space-y-3 p-5">
+          <h2 className="font-semibold">The land</h2>
+          <p className="text-xs text-ink-3">Woods, soil, herds and predators around one village. The world hears that the Creator did it.</p>
+          <select name="settlement" className="input">
+            {state.settlements.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+          <select name="act" className="input" defaultValue="bless">
+            <option value="bless">Bless the land: richer soil, fuller herds and waters</option>
+            <option value="rain">Send rain: wet soil for the crops</option>
+            <option value="wildfire">Send fire through the woods</option>
+            <option value="locusts">Send locusts: half the standing crop</option>
+            <option value="beasts">Send predators into the country</option>
+          </select>
+          <Result s={land} />
+          <button className="btn btn-god w-full" disabled={landing}>Send it</button>
+        </form>
         <form action={settleAction} className="panel space-y-3 p-5">
           <h2 className="font-semibold">Found a settlement</h2>
-          <p className="text-xs text-ink-3">A new village starts as a gathering place. Create founders there, or move people to it.</p>
+          <p className="text-xs text-ink-3">A new village starts as a gathering place. Move people to it, and it will grow by its own births.</p>
           <input name="name" placeholder="Name of the settlement" className="input" maxLength={24} />
           <select name="site" className="input">
             {(state.sites ?? []).map((s) => (

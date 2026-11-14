@@ -2,7 +2,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = extensions, public;
 
-select plan(158);
+select plan(180);
 
 -- Tests never contain the real God email: point the lock at a throwaway address for this
 -- transaction only (everything below is rolled back).
@@ -269,8 +269,6 @@ update sim.agents set piety = 100 where id = (select id from asked);
 select sim.p_prayers(w.tick) from sim.world w;
 select isnt((select status from app.prayers where agent_id = (select id from asked) order by id limit 1), 'open', 'an old prayer is answered without God'); -- 79
 
--- Use up today's arrivals so the old path (waiting for a pregnancy) is tested too; cleared before the arrival tests.
-select sim.log((select tick from sim.world), 'family_arrives', 0::smallint, null, null, null, '{"test": true}') from generate_series(1, 20);
 set local role anon;
 select throws_ok('select api.request_life()', '42501', null, 'visitors cannot ask for a life directly');                                     -- 80
 reset role;
@@ -562,20 +560,33 @@ set local role authenticated;
 select ok(exists (select 1 from jsonb_array_elements(api.god_player_agents()) e where e ->> 'username' = 'finder'), 'God sees every player''s person'); -- 150
 reset role;
 
--- When no young child is free, a family arrives with a newborn, and the soul becomes that baby at once.
-delete from sim.events where kind = 'family_arrives' and data ->> 'test' = 'true';
+-- When no young child is free, nobody is made for the soul: it waits, and is born as the next baby.
 update sim.agents a set birth_tick = birth_tick - 4 * 1440 from sim.world w where a.soul_id is null and w.tick - a.birth_tick < 3 * 1440;
 insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, raw_user_meta_data, created_at, updated_at)
 values ('00000000-0000-0000-0000-000000000000', '88888888-8888-8888-8888-888888888888', 'authenticated', 'authenticated',
         'arrival@example.com', 'x', now(), '{"username":"arrival"}', now(), now());
 select set_config('request.jwt.claims', json_build_object('sub', '88888888-8888-8888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal1')::text, true);
 set local role authenticated;
-select is((api.request_life() ->> 'status'), 'living', 'with no young child free, a soul still begins its life at once');  -- 151
+select is((api.request_life() ->> 'status'), 'waiting', 'with no young child free, a soul waits: nobody is made for it');     -- 151
 reset role;
-select ok((select w.tick - a.birth_tick = 0 and a.mother_id is not null and a.father_id is not null
+select set_config('test.t', (select tick::text from sim.world), true);
+select set_config('test.mum', sim.spawn_agent(current_setting('test.t')::int, 'Sela', 'Marsh', 'F', current_setting('test.t')::int - 24 * 1440,
+  null, null, '{}', 0::smallint, false, (select min(id) from sim.settlements), null, sim.random_traits(811), 50)::text, true);
+select set_config('test.dad', sim.spawn_agent(current_setting('test.t')::int, 'Brann', 'Holt', 'M', current_setting('test.t')::int - 26 * 1440,
+  null, null, '{}', 0::smallint, false, (select min(id) from sim.settlements), null, sim.random_traits(812), 50)::text, true);
+update sim.agents set fate_tick = current_setting('test.t')::int + 200000 where id in (current_setting('test.mum')::bigint, current_setting('test.dad')::bigint);
+select sim.unite(current_setting('test.t')::int, current_setting('test.mum')::bigint, current_setting('test.dad')::bigint);
+update sim.pregnancies set due_tick = current_setting('test.t')::int + 5000 where outcome is null and soul_id is null; -- other babies are far off
+insert into sim.pregnancies (mother_id, father_id, conceived_tick, due_tick)
+values (current_setting('test.mum')::bigint, current_setting('test.dad')::bigint, 100, current_setting('test.t')::int + 8);
+update app.souls set requested_tick = current_setting('test.t')::int - 1000 where user_id = '88888888-8888-8888-8888-888888888888';
+select sim.p_souls(current_setting('test.t')::int);
+select sim.advance(12);
+select ok((select o.status = 'living' and a.mother_id = current_setting('test.mum')::bigint and a.father_id = current_setting('test.dad')::bigint
+             and w.tick - a.birth_tick < 12
              from app.souls o join sim.agents a on a.id = o.agent_id, sim.world w where o.user_id = '88888888-8888-8888-8888-888888888888'),
-          'as the newborn of a family that has just arrived');                                                                 -- 152
-select is(sim.arrivals_today((select tick from sim.world)), 1, 'and the arrival is counted against the daily limit');      -- 153
+          'and is born to a mother and a father');                                                                             -- 152
+select is((select count(*)::int from sim.events where kind = 'family_arrives'), 0, 'no family arrives from nowhere any more'); -- 153
 
 -- Things to do, and questions to ask.
 select ok(exists (select 1 from jsonb_array_elements(sim.deeds_for((select agent_id from app.souls where user_id = '88888888-8888-8888-8888-888888888888'),
@@ -592,6 +603,91 @@ update llm.jobs set status = 'done' where status = 'queued' and kind <> 'mind_as
 select api.minds_claim(5);
 select api.minds_finish_soul((select id from llm.jobs where kind = 'mind_ask' order by id desc limit 1), null, 'Warm. Full. Sleepy.', null, 50, 10, null);
 select is((select question from app.thoughts where kind = 'answer' order by id desc limit 1), 'feel', 'and their own mind answers'); -- 158
+
+------------------------------------------------------------------------------
+-- A living world: everyone is born, people move for love and land, and the land is alive
+------------------------------------------------------------------------------
+select is((select count(*)::int from sim.agents where looks is null or array_length(looks, 1) <> 6), 0, 'everyone has looks of their own'); -- 159
+select ok(coalesce((select bool_and(c.looks[1] between least(m.looks[1], f.looks[1]) - 1 and greatest(m.looks[1], f.looks[1]) + 1)
+                    from sim.agents c join sim.agents m on m.id = c.mother_id join sim.agents f on f.id = c.father_id), false),
+          'a child takes after their parents');                                                                                -- 160
+select ok((api.pub_agent(current_setting('test.mum')::bigint) -> 'looks') is not null, 'a person''s page shows their looks');  -- 161
+select is(jsonb_array_length(api.pub_roster() -> 'skin'), (select count(*)::int from sim.agents), 'the map draws each person as they are'); -- 162
+
+-- The years of creation end.
+update sim.world set creation_end_tick = tick;
+select set_config('request.jwt.claims', json_build_object('sub', '11111111-1111-1111-1111-111111111111', 'role', 'authenticated',
+  'aal', 'aal2', 'amr', json_build_array(json_build_object('method', 'totp', 'timestamp', extract(epoch from now())::bigint)))::text, true);
+set local role authenticated;
+select throws_ok($$select api.god_create_founder('Late', 'Comer', 'F', 20, current_setting('test.town')::int)$$, 'P0001',
+                 'The first people have been made. Everyone after them is born', 'after the years of creation, not even God makes a person'); -- 163
+reset role;
+select set_config('test.people', (select count(*)::text from sim.agents), true);
+select sim.p_yearly((select tick from sim.world));
+select is((select count(*)::int from sim.agents), current_setting('test.people')::int, 'and no couple arrives with the new year'); -- 164
+
+-- Love between villages.
+select set_config('test.t', (select tick::text from sim.world), true);
+select set_config('test.her', sim.spawn_agent(current_setting('test.t')::int, 'Mira', 'Vale', 'F', current_setting('test.t')::int - 20 * 1440,
+  null, null, '{}', 0::smallint, false, (select min(id) from sim.settlements), null, sim.random_traits(901), 0)::text, true);
+select set_config('test.him', sim.spawn_agent(current_setting('test.t')::int, 'Taro', 'Reed', 'M', current_setting('test.t')::int - 21 * 1440,
+  null, null, '{}', 0::smallint, false, current_setting('test.town')::int, null, sim.random_traits(902), 0)::text, true);
+select sim.unite(current_setting('test.t')::int, current_setting('test.her')::bigint, current_setting('test.him')::bigint);
+select is((select count(distinct a.settlement_id)::int from sim.agents a
+           where a.id in (current_setting('test.her')::bigint, current_setting('test.him')::bigint)), 1, 'a couple from two villages makes one home'); -- 165
+select ok(exists (select 1 from sim.events e where e.kind = 'moved' and e.data ->> 'why' = 'love'
+                  and e.agent_id in (current_setting('test.her')::bigint, current_setting('test.him')::bigint)), 'and the one who moved is remembered'); -- 166
+select lives_ok($$select sim.p_far_love(w.tick + g) from sim.world w, generate_series(0, 119) g$$, 'the lonely look to the next village'); -- 167
+select is((select count(*)::int from sim.unions u join sim.agents f on f.id = u.female_id join sim.agents m on m.id = u.male_id
+           where u.end_tick is null and f.settlement_id <> m.settlement_id), 0, 'no couple lives apart');                       -- 168
+
+-- Young families settle new land.
+select set_config('test.f1', sim.spawn_agent(current_setting('test.t')::int, 'Anwen', 'Pike', 'F', current_setting('test.t')::int - 22 * 1440,
+  null, null, '{}', 0::smallint, false, (select min(id) from sim.settlements), null, sim.random_traits(903), 0)::text, true);
+select set_config('test.m1', sim.spawn_agent(current_setting('test.t')::int, 'Corin', 'Ashby', 'M', current_setting('test.t')::int - 24 * 1440,
+  null, null, '{}', 0::smallint, false, (select min(id) from sim.settlements), null, sim.random_traits(904), 0)::text, true);
+select set_config('test.f2', sim.spawn_agent(current_setting('test.t')::int, 'Edda', 'Lowe', 'F', current_setting('test.t')::int - 23 * 1440,
+  null, null, '{}', 0::smallint, false, (select min(id) from sim.settlements), null, sim.random_traits(905), 0)::text, true);
+select set_config('test.m2', sim.spawn_agent(current_setting('test.t')::int, 'Hale', 'Burr', 'M', current_setting('test.t')::int - 25 * 1440,
+  null, null, '{}', 0::smallint, false, (select min(id) from sim.settlements), null, sim.random_traits(906), 0)::text, true);
+select sim.unite(current_setting('test.t')::int, current_setting('test.f1')::bigint, current_setting('test.m1')::bigint);
+select sim.unite(current_setting('test.t')::int, current_setting('test.f2')::bigint, current_setting('test.m2')::bigint);
+select set_config('test.colony', coalesce(sim.send_pioneers(current_setting('test.t')::int, (select min(id) from sim.settlements))::text, ''), true);
+select ok((select count(*) >= 4 from sim.agents a where a.settlement_id = nullif(current_setting('test.colony'), '')::int),
+          'young families leave a village to found a new one');                                                                 -- 169
+select ok(exists (select 1 from sim.events e where e.kind = 'pioneers' and e.settlement_id = nullif(current_setting('test.colony'), '')::int
+                  and (e.data ->> 'families')::int >= 2), 'and the new village knows where its people came from');             -- 170
+select is((select count(*)::int from sim.agents), current_setting('test.people')::int + 6, 'nobody is made along the way');    -- 171
+
+-- The land.
+select sim.p_nature(current_setting('test.t')::int);
+select sim.p_nature(current_setting('test.t')::int + 4);
+select ok((select bool_and(woods between 0 and 1 and richness between 0.15 and 1 and game >= 0 and beasts >= 0 and fish >= 5 and herd >= 0)
+           from sim.settlements), 'every village has woods, soil, wild herds, hunters and fish around it');                    -- 172
+select is((select jsonb_array_length(e -> 'land') from jsonb_array_elements(api.pub_geo() -> 'settlements') e limit 1), 6,
+          'visitors can see the land around a village');                                                                       -- 173
+update sim.settlements set woods = 0.8, soil = 0.05, wx_high = 36, wx_low = 20, wx_rain = 0, wx_kind = 'clear', eco_event_tick = -100000
+ where id = current_setting('test.town')::int;
+select sim.p_nature(current_setting('test.t')::int + g * 4) from generate_series(2, 301) g;
+select ok(exists (select 1 from sim.events e where e.kind = 'nature' and e.data ->> 'kind' = 'wildfire'
+                  and e.settlement_id = current_setting('test.town')::int), 'a hot, dry wood catches fire');                   -- 174
+select ok((select woods < 0.8 from sim.settlements where id = current_setting('test.town')::int), 'and the fire takes its trees'); -- 175
+select ok((select bool_and(food between 0.4 and 1.5) from sim.settlements), 'the land feeds people within sane bounds');        -- 176
+
+select set_config('test.rich', (select richness::text from sim.settlements where id = current_setting('test.town')::int), true);
+select set_config('request.jwt.claims', json_build_object('sub', '22222222-2222-2222-2222-222222222222', 'role', 'authenticated',
+  'aal', 'aal2', 'amr', json_build_array(json_build_object('method', 'totp', 'timestamp', extract(epoch from now())::bigint)))::text, true);
+set local role authenticated;
+select throws_ok($$select api.god_nature(current_setting('test.town')::int, 'bless')$$, '42501', 'Only God may do this', 'a player cannot command the land'); -- 177
+reset role;
+select set_config('request.jwt.claims', json_build_object('sub', '11111111-1111-1111-1111-111111111111', 'role', 'authenticated',
+  'aal', 'aal2', 'amr', json_build_array(json_build_object('method', 'totp', 'timestamp', extract(epoch from now())::bigint)))::text, true);
+set local role authenticated;
+select lives_ok($$select api.god_nature(current_setting('test.town')::int, 'bless')$$, 'God can bless a land');                 -- 178
+reset role;
+select ok((select richness > current_setting('test.rich')::real or richness = 1 from sim.settlements where id = current_setting('test.town')::int),
+          'and its soil grows richer');                                                                                        -- 179
+select ok(exists (select 1 from app.god_actions g where g.action = 'nature'), 'and it is written in the audit log');           -- 180
 
 select * from finish();
 rollback;

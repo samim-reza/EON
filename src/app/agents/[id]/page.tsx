@@ -6,6 +6,7 @@ import { FollowButton } from "@/components/FollowButton";
 import { PersonTools } from "@/components/PersonTools";
 import { LiveActivity, LiveAge, LiveDue } from "@/components/WorldClock";
 import { pub } from "@/lib/pub";
+import { looksOf } from "@/shared/nature";
 import { formatAge, formatEonDate } from "@/shared/time";
 import type { AgentDetail, FeedEvent } from "@/shared/types";
 
@@ -63,6 +64,7 @@ export default async function AgentPage(props: PageProps<"/agents/[id]">) {
   const a = await getAgent((await props.params).id);
   if (!a) notFound();
   const pronoun = a.sex === "F" ? "she" : "he";
+  const looks = a.alive ? looksOf(a.looks, a.age) : null;
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -94,6 +96,7 @@ export default async function AgentPage(props: PageProps<"/agents/[id]">) {
               </>
             )}
           </p>
+          {looks && <p className="mt-1 text-sm text-ink-2">{looks}.</p>}
           {a.alive && a.settlement?.x != null && a.settlement.y != null && (
             <p className="mt-1 text-sm text-ink-3">
               <LiveActivity

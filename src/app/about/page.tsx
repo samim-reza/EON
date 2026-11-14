@@ -21,6 +21,7 @@ const diseases = [
   ["Memory Leak Syndrome", "memories drain away in old age (robotic dementia)"],
   ["Core Arrest", "the core stops without warning (robotic heart attack)"],
   ["Wounds", "a fight that went too far; rare, but it happens"],
+  ["Animal Attack", "wolves, lions or bears, when the wild herds are gone and the hunters are hungry"],
 ];
 
 export default function About() {
@@ -60,6 +61,21 @@ export default function About() {
         parkas. Warm clothes cost money, so the poor feel the cold first.
       </p>
 
+      <h2 className="mt-10 text-xl font-semibold">The living land</h2>
+      <p className="mt-2 text-ink-2">
+        People are not alone. Around every village there are woods, soil, wild herds, the animals that hunt them,
+        fish, and birds that leave for the winter and come back with the spring. Which animals depends on the country:
+        deer and wolves on the grassland, antelope and lions on the savanna, elk and bears in the pine forest,
+        reindeer on the tundra, gazelles in the desert.
+      </p>
+      <p className="mt-2 text-ink-2">
+        The land answers to how it is used. Trees are cut for fields and firewood and grow back slowly. Soil tires
+        when it is farmed hard, and is renewed by fallen leaves, by dung and by the silt a flood leaves behind. Herds
+        that are hunted too hard grow scarce, and hungry predators then come for the village&apos;s own animals. A hot,
+        dry wood can catch fire, and locusts can take a crop. A small village lives well off hunting, fishing and its
+        herd; a town has to farm. You can see the herds grazing on the map, and each village&apos;s country beside it.
+      </p>
+
       <h2 className="mt-10 text-xl font-semibold">Their own words</h2>
       <p className="mt-2 text-ink-2">
         People write diaries, pray in their own words, and remember their dead, and the news goes round the villages.
@@ -78,16 +94,23 @@ export default function About() {
 
       <h2 className="mt-10 text-xl font-semibold">The Creator</h2>
       <p className="mt-2 text-ink-2">
-        EON has one God, The Creator, who made the first two souls. During the first thirty years, The Creator sends
-        more founders so the children of Genesis can find partners outside their own family. The Creator hears
-        prayers, gives newborn lives to those who ask, can work through any agent, and performs miracles. The world
-        never waits: it runs by itself day and night, and every prayer and request is answered in time.
+        EON has one God, The Creator, who made the first two people, and a few more in the first ten years so that
+        their children could find partners outside their own family. Then the making stopped. Since then nobody has
+        been made: every person is born to a mother and a father, and the world renews itself as people do.
+      </p>
+      <p className="mt-2 text-ink-2">
+        The Creator still decides where a soul is born and when a life ends, hears prayers, can overrule a choice or
+        send a dream, and has a hand on the land: rain, fire, locusts, or a blessing on the soil and the herds. The
+        world never waits: it runs by itself day and night, and every prayer and request is answered in time.
       </p>
 
       <h2 className="mt-10 text-xl font-semibold">Life and death</h2>
       <p className="mt-2 text-ink-2">
         Agents grow up, go to school, work as farmers, builders or healers, form partnerships and marry — never with
-        close kin. They have children who inherit a blend of their parents&apos; personalities. They make friends, and
+        close kin. Someone with nobody to court at home looks to the next village and moves for love, and a crowded
+        village sends young families out to settle new land. Children inherit a blend of their parents&apos;
+        personalities and their looks (skin, hair, eyes, height and build), so every person is someone in
+        particular. They make friends, and
         they fall out: over a stray goat, a borrowed tool, the edge of a field. Old grudges sometimes come to blows, and
         the hungry sometimes steal. A small village sees everything, so most thieves are caught and made to give it back.
         Grudges fade, people make peace, and some pray for it. They fall ill:
@@ -104,8 +127,9 @@ export default function About() {
       <h2 className="mt-10 text-xl font-semibold">Becoming an agent</h2>
       <p className="mt-2 text-ink-2">
         Anyone can create an account and ask for a life. If a child under three has no soul yet, you become that child
-        at once; otherwise a new family arrives at a village with a newborn, and you are that baby. From then on you are that person&apos;s soul: once a year while they grow up, and at the big
-        moments after (work, love, marriage, children, quarrels, temptation), the choice is yours.
+        at once; otherwise you wait and are born as the next baby. From then on you are that person&apos;s soul: once
+        a year while they grow up, and at the big moments after (work, love, marriage, children, quarrels,
+        temptation), the choice is yours.
       </p>
       <p className="mt-2 text-ink-2">
         Your person also has a mind of their own, an AI that thinks their thoughts, says their prayers, and decides

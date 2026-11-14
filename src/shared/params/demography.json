@@ -34,6 +34,7 @@
   },
   "genesis": {
     "years": 30,
+    "creationYears": 10,
     "foundersCouplesPerYear": 1,
     "founderAgeMin": 18,
     "founderAgeMax": 25

@@ -27,10 +27,11 @@ function Waiting({ life }: { life: Life }) {
   if (life.status === "waiting") {
     return (
       <p className="mt-2 text-ink-2">
-        Your soul is waiting for a family. The moment a child under three has no soul, you become them.{" "}
+        Your soul is waiting to be born. Nobody is made from nothing in EON: every person has a mother and a father.
+        The moment a child under three has no soul, you become them.{" "}
         {life.expecting > 0
           ? `Otherwise, ${life.expecting} ${life.expecting === 1 ? "family is" : "families are"} expecting a child right now, and a waiting soul is given one about six hours after asking.`
-          : "Otherwise you will be given the next baby on the way."}{" "}
+          : "Otherwise you will be the next baby conceived."}{" "}
         You will get an email the moment your life begins.
       </p>
     );
@@ -255,7 +256,7 @@ export default async function MePage() {
           <p className="mt-2 text-ink-2">
             {status === "ended"
               ? `${life.name ?? "Your last life"} has ended. You can ask for another.`
-              : "Ask for a life. You start at once: as a child under three who has no soul yet, or as the newborn of a family just arriving in a village."}
+              : "Ask for a life. Everyone in EON is born to a mother and a father. If a child under three has no soul yet, you become them at once; otherwise you wait for the next baby."}
           </p>
           <p className="mt-2 text-sm text-ink-3">
             {life.freeDays

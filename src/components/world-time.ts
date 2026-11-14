@@ -85,14 +85,15 @@ export function currentTick(): number | null {
   return now && anchor ? tickAt(anchor, performance.now(), now.paused) : null;
 }
 
-export type Focus = { id?: number; name: string; x: number; y: number };
+/** `biome`, `land` and `pop` come with a village on the map, so the panel beside it can describe its country. */
+export type Focus = { id?: number; name: string; x: number; y: number; biome?: string; land?: number[]; pop?: number };
 
 let focus: Focus | null = null;
 const focusListeners = new Set<() => void>();
 
 /** The place the map is showing, so the clock can report the weather there. */
 export function setFocus(next: Focus) {
-  if (focus?.name === next.name) return;
+  if (focus?.name === next.name && focus.land === next.land) return;
   focus = next;
   focusListeners.forEach((listener) => listener());
 }

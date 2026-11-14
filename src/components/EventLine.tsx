@@ -33,13 +33,15 @@ const COLORS: Record<string, string> = {
   sign: "text-god",
   family_arrives: "text-birth",
   deed: "text-ink-2",
+  nature: "text-life",
+  pioneers: "text-life",
 };
 
 const ICONS: Record<string, string> = {
   birth: "✦", death: "✝", union: "♥", wedding: "◈", pregnant: "◌", diagnosis: "⚕", outbreak: "☣",
   genesis: "☀", founders_arrive: "☀", founder_created: "☀", miracle_heal: "✧", founded: "⌂", became_town: "⌂", became_city: "⌂",
   weather: "☁", harvest: "❧", discovery: "✺", built: "⌂", moved: "→", prayer: "☾", prayer_answered: "✧", spoke: "❝", voice: "✎",
-  friends: "♡", quarrel: "✕", fight: "⚔", theft: "⊘", judged: "⚖", reconciled: "✽", work: "⚒", sign: "✧", family_arrives: "⌂", deed: "·",
+  friends: "♡", quarrel: "✕", fight: "⚔", theft: "⊘", judged: "⚖", reconciled: "✽", work: "⚒", sign: "✧", family_arrives: "⌂", deed: "·", nature: "❦", pioneers: "⌂",
 };
 
 function A({ id, name }: { id: number | null; name: string | null }) {
@@ -82,6 +84,50 @@ function weatherStory(d: Record<string, string | number | boolean | undefined>, 
       return <>The first snow of the year fell{place ? <> on {place}</> : null}</>;
     default:
       return <>The weather turned{place ? <> in {place}</> : null}</>;
+  }
+}
+
+/** The land and its animals. `who` is set when an animal attacked someone. */
+function natureStory(d: Record<string, string | number | boolean | undefined>, place: React.ReactNode, who: React.ReactNode) {
+  const at = place ?? "the village";
+  const beast = String(d.beast ?? "wild animals");
+  const Beast = beast.charAt(0).toUpperCase() + beast.slice(1);
+  const creator = d.by === "creator";
+  switch (d.kind) {
+    case "wildfire":
+      return creator
+        ? <>The Creator sent fire through the {String(d.tree ?? "")} woods of {at}</>
+        : <>Fire swept the {String(d.tree ?? "")} woods around {at} and took {d.lost ? <>about {String(d.lost)} in every hundred trees</> : "many trees"}</>;
+    case "raid":
+      return <>{Beast} took {Number(d.lost) > 1 ? `${String(d.lost)} ${String(d.herd ?? "animals")}` : `one of the ${String(d.herd ?? "animals")}`} from the herd of {at} in the night</>;
+    case "attack":
+      return d.hurt ? <>{Beast} attacked {who} near {at}</> : <>{Beast} came right up to the homes of {at}, and the people drove them off</>;
+    case "locusts":
+      return creator ? <>The Creator sent locusts over the fields of {at}</> : <>A cloud of locusts settled on the fields of {at}</>;
+    case "silt":
+      return <>The flood left dark silt on the fields of {at}: the soil is richer for it</>;
+    case "fish_run":
+      return <>The river at {at} ran silver with fish</>;
+    case "hunt":
+      return <>The hunters of {at} came home with {String(d.animal ?? "game")} enough for a feast</>;
+    case "scarce":
+      return <>{String(d.animal ?? "game").charAt(0).toUpperCase() + String(d.animal ?? "game").slice(1)} have grown scarce around {at}</>;
+    case "thin_woods":
+      return <>The {String(d.tree ?? "")} woods around {at} are thinning: people walk further for firewood</>;
+    case "tired_soil":
+      return <>The fields of {at} are tired: the same soil has been asked for too much</>;
+    case "birds_return":
+      return <>The {String(d.bird ?? "birds")} came back to {at} with the spring</>;
+    case "birds_leave":
+      return <>The {String(d.bird ?? "birds")} left {at} for the winter</>;
+    case "blessing":
+      return <>The Creator blessed the land of {at}: the soil is dark and the herds are fat</>;
+    case "rain":
+      return <>The Creator sent rain to {at}</>;
+    case "beasts":
+      return <>The Creator sent {beast} to the country around {at}</>;
+    default:
+      return <>The land around {at} changed</>;
   }
 }
 
@@ -130,7 +176,13 @@ export function describe(e: FeedEvent) {
     case "built":
       return <>{place ?? "A village"} built a new {(PLACE_NAMES[String(d.building)] ?? "building").toLowerCase()}</>;
     case "moved":
-      return <>{a} moved to {place ?? "a new home"}</>;
+      return d.why === "love"
+        ? <>{a} left {String(d.from ?? "home")} for {place ?? "a new home"} to be with {o}</>
+        : <>{a} moved to {place ?? "a new home"}</>;
+    case "nature":
+      return <>{natureStory(d, place, a)}</>;
+    case "pioneers":
+      return <>{Number(d.families) > 1 ? `${String(d.families)} young families` : "A young family"} left {String(d.from ?? "home")} to settle new land at <span className="text-life">{String(d.name ?? "a new village")}</span></>;
     case "harvest":
       return <>{d.good ? <>A bumper harvest filled the stores{place ? <> of {place}</> : null}</> : <>The harvest failed{place ? <> in {place}</> : null}: food will be dear this year</>}</>;
     case "founded":

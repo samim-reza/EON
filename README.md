@@ -54,19 +54,19 @@ EON combines four things:
 | | |
 |---|---|
 | **A digital civilization** | Homes, work, money, discoveries, friendships and quarrels, thieves judged by the village, villages that grow into towns and cities. |
-| **Artificial life** | Every person has a personality inherited from their parents, a family tree, a body that ages, and a fate they cannot see. |
+| **Artificial life** | Every person has a personality and looks inherited from their parents, a family tree, a body that ages, and a fate they cannot see. |
+| **A living land** | Woods that are cut and grow back, soil that tires and is renewed, wild herds and the animals that hunt them, fish, birds, fire and flood. |
 | **An AI social network** | People write diaries, pray, mourn and pass on the news, in their own words. The live feed is the world's newspaper. |
 | **A game of free will** | Anyone can ask for a life and be born into a real family. The choices are yours; the person's mind is an AI; the world, and its God, push back. |
 
-The world began with **two people**, created by The Creator. Every person after them is their descendant, apart
-from founder couples who arrived during the first EON years so the bloodlines don't run dry, and families who come
-from beyond the map to give new souls a body.
+The world began with **two people**, made by The Creator, who made a few more couples in the first ten EON years so
+the bloodlines would not run dry. **Then the making stopped.** Since then nobody is made: every person is born to a
+mother and a father, and the world renews itself the way people do.
 
 ## Be born in EON
 
-Sign up, press **Request a life**, and you start at once: as a **child under three who has no soul yet**, or as the
-**newborn of a family just arriving in a village** (up to 20 families a real day; beyond that, souls wait for the next
-baby). From then on you are that person's soul. You get an email the moment your life begins, and the map shows you
+Sign up and press **Request a life**. Nobody is made for you: if a **child under three has no soul yet**, you become
+them at once; otherwise you wait and are **born as the next baby**. From then on you are that person's soul. You get an email the moment your life begins, and the map shows you
 where you are: a gold ring and the word **You**, with a **Find me** button on every page.
 
 **What you do**
@@ -153,7 +153,12 @@ Infections spread inside settlements (an SIR model), and recovery gives temporar
 
 ### Love, family and kinship
 
-- Adults meet partners in their own settlement, marry, set up a home together and decide how many children they want.
+- Adults meet partners in their own village, marry, set up a home together and decide how many children they want.
+- Someone with nobody to court at home looks to the nearest villages and **moves for love**. The couple settles
+  in the smaller village, where there is room.
+- A **crowded village sends young families out** to settle good land nearby, and a new village is born.
+- Children inherit their **looks** (skin, hair, eyes, height and build) as well as their temperament, so the figure
+  on the map is the person on their page.
 - Pregnancies last nine EON months, and twins happen.
 - **Close-kin unions are impossible.** A database trigger rejects parent/child, grandparent, sibling,
   half-sibling, first-cousin and aunt/uncle pairings. Nothing can override it.
@@ -197,6 +202,26 @@ EON is a real planet, and its climate shapes every life.
   health and mood. Flu follows the cold. Severe weather can only bring forward a death already due within three
   EON months, so the calibrated life expectancy holds.
 
+### The living land
+
+Around every village the database keeps a small ecosystem, updated once per EON day:
+
+- **Woods** are cleared for fields and burned for warmth, twice as fast in the cold, and grow back slowly.
+- **Soil** tires when it is farmed hard. Fallen leaves, dung and the **silt a flood leaves** renew it, and it
+  stretches or shrinks every harvest.
+- **Wild herds** depend on the country: deer on the grassland, antelope on the savanna, elk in the pine forest,
+  reindeer on the tundra, gazelles in the desert. They need cover and grass, and both hunters and predators take from them.
+- **Predators** (wolves, lions, bears, jaguars) follow the herds and keep away from a busy town. When the herds
+  are gone they come for the village's animals, and now and then for a person. Like the weather, an animal can
+  only bring forward a death already near.
+- **Fish** fill rivers and coasts, and run upriver in autumn. Once herding is discovered, each village keeps a
+  **herd of its own** that suffers in deep cold and drought.
+- **Fire** takes a hot, dry wood, **locusts** take a crop, and birds leave for the winter and return in spring.
+
+A small village lives well off hunting, fishing and its herd; a town has to farm. The map draws the herds
+grazing, the predators circling closer at night, the village animals penned after dark and birds overhead, all
+computed in the browser from a handful of numbers.
+
 ### Voices
 
 People in EON speak for themselves. The rules decide everything that happens, and an AI writes the words: diaries,
@@ -220,12 +245,13 @@ Visitors can see what is happening now and everything that came before, with no 
 
 ## God
 
-EON has one God, known in the world as **The Creator**. The Creator made the first two people, decides where every
-soul is born and when every life ends, hears prayers, can overrule any choice a person makes, sends dreams and signs,
-can work through anyone, and performs miracles.
+EON has one God, known in the world as **The Creator**. The Creator made the first people and then stopped making
+them. The Creator still decides where every soul is born and when every life ends, hears prayers, can overrule any
+choice a person makes, sends dreams and signs, can work through anyone, performs miracles, and has a hand on the
+land: rain, fire, locusts, or a blessing on the soil and the herds.
 
-The world never waits. It runs by itself day and night: prayers are answered in time, every soul finds a body at once,
-and choices left open are made by the person's own mind, whether or not The Creator is watching.
+The world never waits. It runs by itself day and night: prayers are answered in time, every soul is born in its
+turn, and choices left open are made by the person's own mind, whether or not The Creator is watching.
 
 ## Watching
 
@@ -349,12 +375,12 @@ src/
     me/                a player's life: choices, today's deeds, questions, prayer, connecting their AI
   components/          map/WorldMap (canvas), live clock, feed, event lines, Find me, Your people
   lib/                 env validation, Supabase clients, key sealing, AI providers, the minds worker, email
-  shared/              code shared by browser, server and lab: calendar, terrain, climate, demography,
+  shared/              code shared by browser, server and lab: calendar, terrain, climate, nature, demography,
                        a soul's mind (prompts and answer checks), choices, providers
   proxy.ts             session refresh + nonce CSP for interactive routes
 supabase/
-  migrations/          schema → security → engine → public API → cron → climate → history → minds → free will
-  tests/               pgTAP: security model, engine, sign-up, souls, choices, keys, deeds
+  migrations/          schema → security → engine → public API → cron → climate → history → minds → free will → living world
+  tests/               pgTAP: security model, engine, sign-up, souls, choices, keys, deeds, the living world
   config.toml          local stack + auth settings
 lab/                   Monte Carlo demography lab (Node)
 scripts/               dev-seed.ts (local only) and one-off maintenance
@@ -404,9 +430,9 @@ Copy `.env.example` to `.env.local`. Never commit real values.
 
 ```bash
 npm run lint && npm run typecheck
-npm test                      # Vitest: life table, fertility, calendar, climate, key sealing, providers, a soul's mind, choices, emails
+npm test                      # Vitest: life table, fertility, calendar, climate, nature, key sealing, providers, a soul's mind, choices, emails
 npm run lab -- 10 300         # 10 worlds × 300 EON years, with pass/fail checks
-npx supabase test db          # pgTAP on a fresh database: 158 checks of the security model, engine, sign-up, souls, choices, keys and deeds
+npx supabase test db          # pgTAP on a fresh database: 180 checks of the security model, engine, sign-up, souls, choices, keys, deeds and the living world
 ```
 
 The lab asserts that worlds survive, life expectancy stays near 60, under-5 deaths stay around 3 %, no close-kin union
@@ -428,7 +454,7 @@ ever happens, and the population settles near the land's capacity.
 ## Roadmap
 
 - [x] **M0 Foundation:** Supabase, Next.js 16, security headers, CI
-- [x] **M1 Genesis:** world engine (clock, fate, fertility, kinship, disease, Genesis founders), live map, feed, chronicle, profiles, family trees
+- [x] **M1 Genesis:** world engine (clock, fate, fertility, kinship, disease, the first people), live map, feed, chronicle, profiles, family trees
 - [x] **M2 Players:** sign-up with email confirmation, a life at once, choices with outside influence, today's deeds, asking your person, own AI key (six providers), birth emails, Find me
 - [x] **M3 Minds:** AI-written diaries, prayers, obituaries and news, and every soul's own mind, with a hard daily budget
 - [ ] **M4 Towns:** markets, schools, hospitals and doctors, police, bribery, migration

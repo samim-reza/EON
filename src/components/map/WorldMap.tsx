@@ -10,6 +10,7 @@ import { climateOf } from "@/components/local-climate";
 import { currentTick, setFocus, setResidents, useWorld, type Resident } from "@/components/world-time";
 import { localHour, NO_TUNING, seasonCurve, smooth, tideAt, weatherAt, yearFraction, type Weather } from "@/shared/climate";
 import { buildingFor, outfitFor, planFor, slotInfo, SLOTS_PER_TICK, spotFor, type Outfit, type Plan } from "@/shared/daily-life";
+import { landOf, SKIN_TONES, wildlifeAt, type Creature } from "@/shared/nature";
 import { PLACE_NAMES, roadTier } from "@/shared/progress";
 import { alongPath, buildRoads, linkSettlements, routeBetween } from "@/shared/roads";
 import { TILE_UNITS } from "@/shared/terrain-pixels";
@@ -22,6 +23,8 @@ import { loadTerrain, setTide, tilesFor, type TerrainMap } from "./terrain";
 type Agent = {
   id: number; name: string; sex: "F" | "M"; birth: number; settlement: number; home: number | null;
   job: string; partner: number | null; flags: number;
+  /** Skin tone 0 to 4, inherited from their parents. Missing on an old server: the map then picks one. */
+  skin?: number;
 };
 
 type Cam = { x: number; y: number; z: number }; // world-space centre, pixels per world unit
@@ -38,7 +41,7 @@ const HERO_NIGHT_LIFT = 0.1; // the landing page stays readable at midnight
 function unpack(r: Roster): Agent[] {
   return r.id.map((id, i) => ({
     id, name: r.name[i], sex: r.sex[i], birth: r.birth[i], settlement: r.settlement[i], home: r.home[i],
-    job: r.job[i], partner: r.partner[i], flags: r.flags[i],
+    job: r.job[i], partner: r.partner[i], flags: r.flags[i], skin: r.skin?.[i],
   }));
 }
 
@@ -64,7 +67,40 @@ function windowLit(id: number, kind: string, hour: number) {
   return hour >= 15 ? hour < 21 + 2.6 * hash01(id, 3) : hour >= 4.8 + 2 * hash01(id, 3);
 }
 
-const SKINS = ["#f1d3b8", "#e0b48e", "#c68f63", "#9a6a45", "#6f4a31"];
+const SKINS = SKIN_TONES;
+const WILDLIFE_FROM_ZOOM = 2.2; // herds show once a village fills a good part of the screen
+const CREATURE_COLOURS = { grazer: "#b08d57", hunter: "#2b2724", herd: "#efe7d6" };
+
+/** One animal: a small body turned the way it is heading, or a bird as a shallow V. */
+function drawCreature(ctx: CanvasRenderingContext2D, a: Creature, x: number, y: number, unit: number) {
+  const cos = Math.cos(a.heading);
+  const sin = Math.sin(a.heading);
+  if (a.kind === "bird") {
+    const w = unit * 1.2;
+    ctx.strokeStyle = "rgba(245, 247, 250, 0.85)";
+    ctx.lineWidth = Math.max(0.8, unit * 0.32);
+    ctx.beginPath();
+    ctx.moveTo(x - w * cos + w * sin, y - w * sin - w * cos);
+    ctx.lineTo(x, y);
+    ctx.lineTo(x - w * cos - w * sin, y - w * sin + w * cos);
+    ctx.stroke();
+    return;
+  }
+  const u = unit * (a.kind === "grazer" ? 1 : a.kind === "hunter" ? 0.9 : 0.8);
+  ctx.fillStyle = "rgba(0, 0, 0, 0.28)";
+  ctx.beginPath();
+  ctx.ellipse(x + u * 0.25, y + u * 0.3, u * 1.1, u * 0.6, a.heading, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = CREATURE_COLOURS[a.kind];
+  ctx.beginPath();
+  ctx.ellipse(x, y, u * 1.1, u * 0.6, a.heading, 0, Math.PI * 2);
+  ctx.fill();
+  if (u >= 1.8) {
+    ctx.beginPath();
+    ctx.arc(x + cos * u * 1.15, y + sin * u * 1.15, u * 0.42, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
 const FIGURES_FROM_ZOOM = 6.5; // close enough to see what people are wearing
 
 /** A tiny dressed person, for close zoom. Their sex colour stays as a ring at their feet. */
@@ -227,6 +263,7 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
     return buildRoads(places, new Map([...settlementById].map(([id, s]) => [id, { x: s.x, y: s.y }])));
   }, [idx, settlementById]);
   const links = useMemo(() => (geo ? linkSettlements(geo.settlements, makeTerrain(Number(geo.seed)).elevation) : []), [geo]);
+  const elevation = useMemo(() => (geo ? makeTerrain(Number(geo.seed)).elevation : null), [geo]);
   const routes = useRef(new Map<string, { x: number; y: number }[]>());
   useEffect(() => routes.current.clear(), [roads]);
 
@@ -380,7 +417,7 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
         if (label !== shownStop) {
           shownStop = label;
           setStop({ name: at.name, pop: at.pop });
-          setFocus({ id: at.id, name: at.name, x: at.x, y: at.y });
+          setFocus({ id: at.id, name: at.name, x: at.x, y: at.y, biome: at.biome, land: at.land, pop: at.pop });
         }
       }
       // The hero keeps the village clear of the headline and of the feed.
@@ -395,7 +432,7 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
       if (!hero && ts - lastFocusCheck > 700 && geo?.settlements.length) {
         lastFocusCheck = ts;
         const nearest = geo.settlements.reduce((best, s) => (Math.hypot(s.x - c.x, s.y - c.y) < Math.hypot(best.x - c.x, best.y - c.y) ? s : best));
-        setFocus({ id: nearest.id, name: nearest.name, x: nearest.x, y: nearest.y });
+        setFocus({ id: nearest.id, name: nearest.name, x: nearest.x, y: nearest.y, biome: nearest.biome, land: nearest.land, pop: nearest.pop });
       }
       if (terrain.current) {
         ctx.imageSmoothingEnabled = true;
@@ -477,6 +514,27 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
         }
       }
 
+      // the wild: herds, the animals that hunt them, the village's own animals, and birds overhead
+      if (geo && elevation && c.z >= WILDLIFE_FROM_ZOOM) {
+        const daylight = atmosphere.current?.value.daylight ?? 1;
+        const unit = Math.max(1.1, Math.min(4.2, c.z * 0.24));
+        const reach = 60 * c.z;
+        const onLand = (x: number, y: number) => elevation(x, y) >= 0.02;
+        for (const s of geo.settlements) {
+          const land = landOf(s.land);
+          if (!land) continue;
+          const px = sx(s.x);
+          const py = sy(s.y);
+          if (px < -reach || py < -reach || px > W + reach || py > H + reach) continue;
+          for (const a of wildlifeAt(s, land, tf, daylight, onLand)) {
+            const x = sx(a.x);
+            const y = sy(a.y);
+            if (x < -8 || y < -8 || x > W + 8 || y > H + 8) continue;
+            drawCreature(ctx, a, x, y, unit);
+          }
+        }
+      }
+
       // sky: clouds, the light of the hour, then what shines through the dark
       const sky = atmosphere.current?.value;
       if (sky) {
@@ -522,7 +580,7 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
             const person = { id: a.id, job: a.job, ageYears: (tf - a.birth) / 1440 };
             const biome = climateOf(seed, settlementById.get(a.settlement)?.x ?? 500, settlementById.get(a.settlement)?.y ?? 500).biome;
             ctx.globalAlpha = p.plan.indoors && !p.moving ? 0.8 : 1;
-            drawFigure(ctx, x, y, size, outfitFor(person, p.plan, p.weather, biome), SKINS[Math.floor(hash01(a.id, 53) * SKINS.length)], a.sex === "F" ? "#e58bd5" : "#4fd1c5");
+            drawFigure(ctx, x, y, size, outfitFor(person, p.plan, p.weather, biome), SKINS[a.skin ?? Math.floor(hash01(a.id, 53) * SKINS.length)] ?? SKINS[2], a.sex === "F" ? "#e58bd5" : "#4fd1c5");
             if (a.flags & (FLAG_SICK | FLAG_PREGNANT | FLAG_PLAYER | FLAG_FOUNDER)) {
               ctx.lineWidth = 1;
               ctx.strokeStyle = a.flags & FLAG_PLAYER ? "#ffffff" : a.flags & FLAG_SICK ? "#d9a441" : a.flags & FLAG_PREGNANT ? "#ffb3ec" : "#f5b84b";
@@ -640,7 +698,7 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
     };
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
-  }, [agents, geo, groups, hero, homeNames, idx, links, now?.tick, positionOf, roads, seed, selected, settlementById, follow, stops]);
+  }, [agents, elevation, geo, groups, hero, homeNames, idx, links, now?.tick, positionOf, roads, seed, selected, settlementById, follow, stops]);
 
   // --- interaction ------------------------------------------------------------------
   const pointers = useRef(new Map<number, { x: number; y: number }>());
@@ -851,13 +909,20 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
         </div>
       </div>
 
-      <div className="absolute bottom-3 left-3 hidden gap-3 rounded-lg bg-bg/70 px-3 py-2 text-[11px] text-ink-2 sm:flex">
+      <div className="absolute bottom-3 left-3 hidden max-w-[calc(100%-1.5rem)] flex-wrap gap-x-3 gap-y-1 rounded-lg bg-bg/70 px-3 py-2 text-[11px] text-ink-2 sm:flex">
         <span><span className="text-love">●</span> female</span>
         <span><span className="text-life">●</span> male</span>
         <span><span className="text-ink-2">●</span> elder</span>
         <span><span className="text-sick">○</span> sick</span>
         <span><span className="text-god">○</span> founder</span>
         <span>○ human soul</span>
+        {geo?.settlements.some((s) => s.land) && (
+          <>
+            <span><span style={{ color: CREATURE_COLOURS.grazer }}>●</span> wild herds</span>
+            <span><span style={{ color: "#6b625b" }}>●</span> hunters</span>
+            <span><span style={{ color: CREATURE_COLOURS.herd }}>●</span> livestock</span>
+          </>
+        )}
         {myPerson && <span className="text-god">◎ you</span>}
       </div>
 

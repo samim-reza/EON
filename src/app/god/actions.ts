@@ -134,6 +134,15 @@ export async function foundSettlement(_prev: ActionResult, form: FormData): Prom
   return godRpc("god_found_settlement", { p_site: parsed.data.site, p_name: parsed.data.name });
 }
 
+const natureSchema = z.object({ settlement: z.coerce.number().int().min(1), act: z.enum(["bless", "rain", "wildfire", "locusts", "beasts"]) });
+
+/** The Creator's hand on the land around one village. */
+export async function nature(_prev: ActionResult, form: FormData): Promise<ActionResult> {
+  const parsed = natureSchema.safeParse(Object.fromEntries(form));
+  if (!parsed.success) return fail("Choose a village and what to send.");
+  return godRpc("god_nature", { p_settlement: parsed.data.settlement, p_act: parsed.data.act });
+}
+
 const moveSchema = z.object({ agent: z.coerce.number().int().min(1), settlement: z.coerce.number().int().min(1) });
 
 export async function moveAgent(_prev: ActionResult, form: FormData): Promise<ActionResult> {

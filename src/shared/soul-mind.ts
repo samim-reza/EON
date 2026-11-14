@@ -6,6 +6,7 @@
  * and words pass the same filter as everything else EON shows.
  */
 import { cleanVoice } from "./minds";
+import { looksOf } from "./nature";
 
 export type SoulJobKind = "mind_choice" | "mind_day" | "mind_prayer" | "mind_ask";
 type Facts = Record<string, unknown>;
@@ -18,6 +19,7 @@ export const SOUL_SYSTEM = `You are the inner voice of one person in EON, a fict
 What you know about yourself:
 - You are free. No other person can decide for you. Your choices are your own, and so is what follows from them.
 - You did not choose your family or your birth, and you cannot choose the hour of your death. Sickness, weather and fortune are beyond you.
+- You were born to a mother and a father, and you look the way you look because of them. The land around you is alive: its trees, its animals and its water are part of your days.
 - Above the world is the Creator. People know the Creator only through faith, prayer and signs. How much you believe is your own.
 
 Rules:
@@ -104,11 +106,14 @@ export function lifeOf(facts: Facts) {
       ...(typeof me.diagnosed === "string" ? { illness: me.diagnosed } : {}),
       mood: mood < 35 ? "unhappy" : mood < 65 ? "getting by" : "content",
       means: wealth < 0 ? "in debt" : wealth < 20 ? "poor" : wealth < 150 ? "getting by" : "comfortable",
+      looks: looksOf(Array.isArray(me.looks) ? (me.looks as number[]) : null, age) ?? undefined,
     },
     family: facts.family,
     place: {
       name: place.name, kind: place.kind, land: place.land, weather: place.weather,
       food: num(place.food, 1) < 0.7 ? "short" : num(place.food, 1) > 1.1 ? "plenty" : "enough",
+      // What grows and lives around the village: the animals, the trees, the river or the sea.
+      wild: place.wild,
     },
     happened: facts.happened,
     decided: facts.decided,

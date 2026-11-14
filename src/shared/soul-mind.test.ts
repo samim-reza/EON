@@ -50,3 +50,17 @@ describe("a soul's mind", () => {
       .toEqual({ choice: null, thought: "The rain is loud tonight, see for more.", prayer: null });
   });
 });
+
+describe("a mind in a living world", () => {
+  it("knows what it looks like and what lives around it", () => {
+    const life = lifeOf({
+      me: { name: "Mira Vale", sex: "F", age: 30, looks: [3, 0, 2, 1, 80, 50] },
+      place: { name: "Elysium", land: "grassland", wild: { animals: "deer", hunters: "wolves", woods: "open", river: true } },
+    });
+    expect(life.you.looks).toBe("Tall, with curly black hair, brown eyes and dark brown skin");
+    expect(life.place.wild).toEqual({ animals: "deer", hunters: "wolves", woods: "open", river: true });
+  });
+  it("says nothing about looks it was not told", () => {
+    expect(lifeOf({ me: { name: "Old Soul", age: 40 } }).you.looks).toBeUndefined();
+  });
+});

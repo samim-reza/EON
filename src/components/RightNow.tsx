@@ -1,6 +1,7 @@
 "use client";
 
 import { ticksToFullMoon } from "@/shared/climate";
+import { describeLand, landOf } from "@/shared/nature";
 import { planFor, slotInfo, SLOTS_PER_TICK } from "@/shared/daily-life";
 import { ageName, knownBuildings } from "@/shared/progress";
 import { realDuration, ticksToHarvest } from "@/shared/time";
@@ -35,6 +36,8 @@ export function RightNow({ initial = null, heading = true }: { initial?: NowStat
     { label: "The harvest", left: ticksToHarvest(tick) },
     { label: "Full moon", left: ticksToFullMoon(Number(now.seed), tick) },
   ].sort((a, b) => a.left - b.left);
+  const land = focus ? landOf(focus.land) : null;
+  const country = land ? describeLand(land, focus?.biome, focus?.pop ?? people.length) : [];
   const next = [...(baby ? [{ label: `${baby.name}'s baby`, left: baby.dueTick - tick }] : []), ...calendar].slice(0, 2).sort((a, b) => a.left - b.left);
 
   return (
@@ -71,6 +74,19 @@ export function RightNow({ initial = null, heading = true }: { initial?: NowStat
           </li>
         ))}
       </ul>
+      {country.length > 0 && (
+        <>
+          <h3 className="mt-2 text-xs uppercase tracking-widest text-ink-3">The land</h3>
+          <ul className="mt-1 space-y-0.5 text-xs text-ink-2">
+            {country.map((line) => (
+              <li key={line.label} className="flex justify-between gap-3">
+                <span className="shrink-0">{line.label}</span>
+                <span className={`text-right ${line.tone === "bad" ? "text-sick" : line.tone === "good" ? "text-life" : "text-ink-3"}`}>{line.text}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
     </div>
   );
 }

@@ -93,6 +93,8 @@ export type Roster = {
   job: string[];
   partner: (number | null)[];
   flags: number[];
+  /** Each person's skin tone, 0 to 4. Absent until the living-world migration has run. */
+  skin?: number[];
 };
 
 export const FLAG_PLAYER = 1;
@@ -111,6 +113,9 @@ export type Settlement = {
   pop: number;
   /** Food stores: 1 is a normal year. */
   food?: number;
+  /** The kind of country, and `[woods, richness, game, beasts, fish, herd]` around the village. Absent until the living-world migration has run. */
+  biome?: string;
+  land?: number[];
 };
 
 /** [id, settlementId, kind, x, y] */
@@ -157,6 +162,8 @@ export type AgentDetail = {
   reputation?: number;
   diagnosed?: string | null;
   homeId?: number | null;
+  /** `[skin, hair, curl, eyes, height, build]`, inherited from the parents. */
+  looks?: number[] | null;
   pregnant?: boolean;
   /** When the baby is due, so the wait is visible. */
   dueTick?: number | null;
