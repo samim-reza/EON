@@ -15,7 +15,7 @@ jobs:
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci_placeholder_value
       SUPABASE_SECRET_KEY: sb_secret_ci_placeholder_value_x
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -33,7 +33,7 @@ jobs:
   database:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # Pinned: asking GitHub for "latest" on every run is rate-limited and fails the job at random,
       # and a fixed version means a new CLI release can never change what CI does unnoticed.
       - uses: supabase/setup-cli@v1
