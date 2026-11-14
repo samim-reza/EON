@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { FeedEvent } from "@/shared/types";
 import { EventLine } from "./EventLine";
+import { setRecentEvents } from "./world-time";
 
 type Props = { initial?: FeedEvent[]; importance?: 1 | 2 | 3; pageable?: boolean; limit?: number; compact?: boolean };
 
@@ -20,6 +21,7 @@ export function LiveFeed({ initial = [], importance = 2, pageable = false, limit
         const r = await fetch(`/api/pub/feed?imp=${importance}`);
         if (!r.ok) return;
         const fresh: FeedEvent[] = await r.json();
+        if (importance === 1) setRecentEvents(fresh); // the map draws what just happened: fire, flood
         const add = fresh.filter((e) => !seen.current.has(e.id));
         if (add.length) {
           add.forEach((e) => seen.current.add(e.id));

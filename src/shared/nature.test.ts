@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Biome } from "./climate";
-import { describeLand, FAUNA, faunaOf, landOf, looksOf, roughly, SKIN_TONES, wildlifeAt } from "./nature";
+import { burnScar, creatureStory, describeLand, FAUNA, faunaOf, groveOf, landOf, looksOf, roughly, SKIN_TONES, wildlifeAt } from "./nature";
 
 const land = { woods: 0.2, richness: 0.6, game: 200, beasts: 4, fish: 300, herd: 30 };
 const place = { id: 3, x: 500, y: 500 };
@@ -102,5 +102,48 @@ describe("looksOf", () => {
   });
   it("has a map colour for every skin tone", () => {
     expect(SKIN_TONES).toHaveLength(5);
+  });
+});
+
+describe("creatureStory", () => {
+  it("tells a visitor about the animals they clicked", () => {
+    expect(creatureStory("grazer", land, "grassland", "Elysium")).toEqual({ title: "Deer", lines: ["About 200 deer graze around Elysium.", "The herds are healthy."] });
+    expect(creatureStory("herd", land, "savanna", "Brookfield").title).toBe("The village cattle");
+    expect(creatureStory("bird", land, "taiga", "Northby").lines[0]).toBe("Geese over Northby.");
+  });
+  it("warns when the herds are gone and the hunters are hungry", () => {
+    const lines = creatureStory("hunter", { ...land, game: 20 }, "grassland", "Elysium").lines;
+    expect(lines).toHaveLength(3);
+    expect(lines[2]).toContain("hungry");
+    expect(creatureStory("grazer", { ...land, game: 20 }, "grassland", "Elysium").lines[1]).toContain("scarce");
+  });
+});
+
+describe("groveOf", () => {
+  it("draws more trees where more of the land is wooded", () => {
+    const thick = groveOf(place, 0.85, "forest", everywhere);
+    const thin = groveOf(place, 0.3, "forest", everywhere);
+    expect(thick.trees.length).toBeGreaterThan(thin.trees.length * 2);
+    expect(thick.stumps).toHaveLength(0);
+  });
+  it("leaves stumps where woods were cut, nearest the houses first", () => {
+    const g = groveOf(place, 0.4, "forest", everywhere);
+    expect(g.stumps.length).toBeGreaterThan(0);
+    const far = (p: { x: number; y: number }) => Math.hypot(p.x - place.x, p.y - place.y);
+    expect(Math.max(...g.stumps.map(far))).toBeLessThanOrEqual(Math.min(...g.trees.map(far)));
+  });
+  it("gives each country its own kind of tree and keeps them out of the sea", () => {
+    expect(groveOf(place, 0.8, "taiga", everywhere).trees[0].shape).toBe("conifer");
+    expect(groveOf(place, 0.03, "desert", everywhere).trees.every((t) => t.shape === "palm")).toBe(true);
+    expect(groveOf(place, 0.8, "forest", () => false).trees).toHaveLength(0);
+  });
+});
+
+describe("burnScar", () => {
+  it("fades as the woods grow back", () => {
+    expect(burnScar(1000, 1000)).toBe(1);
+    expect(burnScar(1000, 1000 + 1440)).toBeCloseTo(0.5);
+    expect(burnScar(1000, 1000 + 5000)).toBe(0);
+    expect(burnScar(null, 1000)).toBe(0);
   });
 });

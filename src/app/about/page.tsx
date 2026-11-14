@@ -73,7 +73,10 @@ export default function About() {
         when it is farmed hard, and is renewed by fallen leaves, by dung and by the silt a flood leaves behind. Herds
         that are hunted too hard grow scarce, and hungry predators then come for the village&apos;s own animals. A hot,
         dry wood can catch fire, and locusts can take a crop. A small village lives well off hunting, fishing and its
-        herd; a town has to farm. You can see the herds grazing on the map, and each village&apos;s country beside it.
+        herd; a town has to farm. The map shows it as it is: the woods a village has left and the stumps where
+        they were cut, the black scar of a fire, flood water on the fields, smoke from the chimneys when it is cold,
+        boats on the sea, the herds grazing. Click a village, an animal or a building to learn about it, and turn
+        on the sound to hear its weather.
       </p>
 
       <h2 className="mt-10 text-xl font-semibold">Their own words</h2>
@@ -129,7 +132,9 @@ export default function About() {
         Anyone can create an account and ask for a life. If a child under three has no soul yet, you become that child
         at once; otherwise you wait and are born as the next baby. From then on you are that person&apos;s soul: once
         a year while they grow up, and at the big moments after (work, love, marriage, children, quarrels,
-        temptation), the choice is yours.
+        temptation), the choice is yours. Between those moments you can act four times a day: with people (play,
+        visit, help, teach, make peace) and on the land (hunt, fish, gather, cut firewood, plant trees, tend the
+        herd). What you take comes out of your village&apos;s real herds, waters and woods.
       </p>
       <p className="mt-2 text-ink-2">
         Your person also has a mind of their own, an AI that thinks their thoughts, says their prayers, and decides

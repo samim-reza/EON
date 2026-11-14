@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { advanceAnchor, tickAt, type TickAnchor } from "@/shared/time";
-import type { NowState } from "@/shared/types";
+import type { FeedEvent, NowState } from "@/shared/types";
 
 const POLL_MS = 30_000;
 const MAX_BACKOFF_MS = 5 * 60_000;
@@ -142,3 +142,23 @@ export function useTick(): number | null {
   }, []);
   return tick;
 }
+
+let recent: readonly FeedEvent[] = [];
+const recentListeners = new Set<() => void>();
+
+/** The newest events, shared by the feed that fetched them, so the map can show a fire or a flood without asking again. */
+export function setRecentEvents(next: readonly FeedEvent[]) {
+  recent = next;
+  recentListeners.forEach((listener) => listener());
+}
+
+export const recentEvents = () => recent;
+
+function subscribeRecent(listener: () => void) {
+  recentListeners.add(listener);
+  return () => {
+    recentListeners.delete(listener);
+  };
+}
+
+export const useRecentEvents = () => useSyncExternalStore(subscribeRecent, recentEvents, recentEvents);

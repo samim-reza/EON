@@ -2,7 +2,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = extensions, public;
 
-select plan(180);
+select plan(185);
 
 -- Tests never contain the real God email: point the lock at a throwaway address for this
 -- transaction only (everything below is rolled back).
@@ -688,6 +688,28 @@ reset role;
 select ok((select richness > current_setting('test.rich')::real or richness = 1 from sim.settlements where id = current_setting('test.town')::int),
           'and its soil grows richer');                                                                                        -- 179
 select ok(exists (select 1 from app.god_actions g where g.action = 'nature'), 'and it is written in the audit log');           -- 180
+
+-- People live off the land and look after it, and it shows.
+select set_config('test.me', (select agent_id::text from app.souls where user_id = '88888888-8888-8888-8888-888888888888'), true);
+update sim.settlements set biome = 'forest', woods = 0.5, game = 150, fish = 200, herd = 10
+ where id = (select settlement_id from sim.agents where id = current_setting('test.me')::bigint);
+update sim.agents set birth_tick = (select tick - 20 * 1440 from sim.world), occupation = 'farmer' where id = current_setting('test.me')::bigint;
+delete from app.deeds where agent_id = current_setting('test.me')::bigint;
+select ok((select count(*) = 5 from jsonb_array_elements(sim.deeds_for(current_setting('test.me')::bigint, (select tick from sim.world))) e
+           where e ->> 'id' in ('hunt', 'fish', 'wood', 'plant', 'herd')), 'a grown person can hunt, fish, cut wood, plant trees and tend the herd'); -- 181
+select set_config('request.jwt.claims', json_build_object('sub', '88888888-8888-8888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal1')::text, true);
+set local role authenticated;
+select matches(api.do_deed('wood'), 'beech wood', 'cutting firewood is a deed');                                               -- 182
+reset role;
+select ok((select woods < 0.5 from sim.settlements where id = (select settlement_id from sim.agents where id = current_setting('test.me')::bigint)),
+          'and it thins the village''s real woods');                                                                           -- 183
+set local role authenticated;
+select api.do_deed('plant'); select api.do_deed('plant');
+reset role;
+select ok((select woods > 0.5 from sim.settlements where id = (select settlement_id from sim.agents where id = current_setting('test.me')::bigint)),
+          'planting trees grows them back');                                                                                   -- 184
+select ok((select (e ->> 'burn') is not null from jsonb_array_elements(api.pub_geo() -> 'settlements') e
+           where (e ->> 'id')::int = current_setting('test.town')::int), 'the map knows where the woods burned');              -- 185
 
 select * from finish();
 rollback;

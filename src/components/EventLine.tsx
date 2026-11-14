@@ -215,6 +215,8 @@ export function describe(e: FeedEvent) {
         work: <>{a} worked extra hard</>, rest: <>{a} rested</>, visit: <>{a} visited {o}</>,
         help: <>{a} helped {o}</>, teach: <>{a} taught {o}</>, peace: <>{a} went to {o} to make peace</>,
         love: <>{a} went looking for love</>, give: <>{a} gave to someone in need</>,
+        forage: <>{a} went gathering</>, fish: <>{a} went fishing</>, hunt: <>{a} went hunting</>,
+        wood: <>{a} cut firewood</>, plant: <>{a} planted trees</>, herd: <>{a} tended the village herd</>,
       };
       return did[String(d.deed)] ?? <>{a} did something</>;
     }

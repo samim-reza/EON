@@ -116,6 +116,10 @@ export type Settlement = {
   /** The kind of country, and `[woods, richness, game, beasts, fish, herd]` around the village. Absent until the living-world migration has run. */
   biome?: string;
   land?: number[];
+  /** By a river, on the coast, and the tick its woods last burned. Absent until the land-deeds migration has run. */
+  river?: boolean;
+  coast?: boolean;
+  burn?: number;
 };
 
 /** [id, settlementId, kind, x, y] */

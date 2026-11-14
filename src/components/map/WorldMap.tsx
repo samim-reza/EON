@@ -7,17 +7,20 @@ import { useMe } from "@/components/me";
 import { RightNow } from "@/components/RightNow";
 import { LiveActivity, LiveAge, WorldClock } from "@/components/WorldClock";
 import { climateOf } from "@/components/local-climate";
-import { currentTick, setFocus, setResidents, useWorld, type Resident } from "@/components/world-time";
+import { currentTick, recentEvents, setFocus, setResidents, useRecentEvents, useWorld, type Resident } from "@/components/world-time";
 import { localHour, NO_TUNING, seasonCurve, smooth, tideAt, weatherAt, yearFraction, type Weather } from "@/shared/climate";
 import { buildingFor, outfitFor, planFor, slotInfo, SLOTS_PER_TICK, spotFor, type Outfit, type Plan } from "@/shared/daily-life";
-import { landOf, SKIN_TONES, wildlifeAt, type Creature } from "@/shared/nature";
+import { burnScar, faunaOf, groveOf, landOf, SKIN_TONES, wildlifeAt, type CreatureKind, type Grove } from "@/shared/nature";
 import { PLACE_NAMES, roadTier } from "@/shared/progress";
 import { alongPath, buildRoads, linkSettlements, routeBetween } from "@/shared/roads";
 import { TILE_UNITS } from "@/shared/terrain-pixels";
 import { FLAG_FOUNDER, FLAG_PLAYER, FLAG_PREGNANT, FLAG_SICK, type Geo, type Roster } from "@/shared/types";
 import { lifeStage } from "@/shared/time";
 import { hash01, indexBuildings, makeTerrain, settleOnLand, WORLD_SIZE, type BuildingIndex } from "@/shared/world";
+import { startAmbience, type Ambience } from "./ambience";
 import { createAtmosphere, type Atmosphere } from "./atmosphere";
+import { BuildingCard, CreatureCard, VillageCard, type Card, type Picked } from "./MapCard";
+import { boatSpots, CREATURE_COLOURS, drawBoat, drawBurn, drawCreature, drawFlames, drawFlood, drawGrove, drawSmoke } from "./scenery";
 import { loadTerrain, setTide, tilesFor, type TerrainMap } from "./terrain";
 
 type Agent = {
@@ -69,38 +72,10 @@ function windowLit(id: number, kind: string, hour: number) {
 
 const SKINS = SKIN_TONES;
 const WILDLIFE_FROM_ZOOM = 2.2; // herds show once a village fills a good part of the screen
-const CREATURE_COLOURS = { grazer: "#b08d57", hunter: "#2b2724", herd: "#efe7d6" };
+const SMOKE_FROM_ZOOM = 5;
+const TURNING_LEAVES = new Set(["forest", "grassland", "mountain"]); // where the woods go gold in autumn
 
-/** One animal: a small body turned the way it is heading, or a bird as a shallow V. */
-function drawCreature(ctx: CanvasRenderingContext2D, a: Creature, x: number, y: number, unit: number) {
-  const cos = Math.cos(a.heading);
-  const sin = Math.sin(a.heading);
-  if (a.kind === "bird") {
-    const w = unit * 1.2;
-    ctx.strokeStyle = "rgba(245, 247, 250, 0.85)";
-    ctx.lineWidth = Math.max(0.8, unit * 0.32);
-    ctx.beginPath();
-    ctx.moveTo(x - w * cos + w * sin, y - w * sin - w * cos);
-    ctx.lineTo(x, y);
-    ctx.lineTo(x - w * cos - w * sin, y - w * sin + w * cos);
-    ctx.stroke();
-    return;
-  }
-  const u = unit * (a.kind === "grazer" ? 1 : a.kind === "hunter" ? 0.9 : 0.8);
-  ctx.fillStyle = "rgba(0, 0, 0, 0.28)";
-  ctx.beginPath();
-  ctx.ellipse(x + u * 0.25, y + u * 0.3, u * 1.1, u * 0.6, a.heading, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = CREATURE_COLOURS[a.kind];
-  ctx.beginPath();
-  ctx.ellipse(x, y, u * 1.1, u * 0.6, a.heading, 0, Math.PI * 2);
-  ctx.fill();
-  if (u >= 1.8) {
-    ctx.beginPath();
-    ctx.arc(x + cos * u * 1.15, y + sin * u * 1.15, u * 0.42, 0, Math.PI * 2);
-    ctx.fill();
-  }
-}
+type Hit = { type: "agent"; agent: Agent } | Picked;
 const FIGURES_FROM_ZOOM = 6.5; // close enough to see what people are wearing
 
 /** A tiny dressed person, for close zoom. Their sex colour stays as a ring at their feet. */
@@ -183,6 +158,12 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
   const [geo, setGeo] = useState<Geo | null>(null);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [selected, setSelected] = useState<Agent | null>(null);
+  const [picked, setPicked] = useState<Card | null>(null);
+  const [sound, setSound] = useState(false);
+  const ambience = useRef<Ambience | null>(null);
+  const tipRef = useRef<HTMLDivElement>(null);
+  const lastHover = useRef(0);
+  const events = useRecentEvents();
   const [follow, setFollow] = useState(false);
   const [query, setQuery] = useState("");
   const [loadFailed, setLoadFailed] = useState(false);
@@ -268,6 +249,36 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
   }, [idx, settlementById]);
   const links = useMemo(() => (geo ? linkSettlements(geo.settlements, makeTerrain(Number(geo.seed)).elevation) : []), [geo]);
   const elevation = useMemo(() => (geo ? makeTerrain(Number(geo.seed)).elevation : null), [geo]);
+
+  /** Each village's buildings, so the scenery around it never has to search the whole world. */
+  const buildingsBy = useMemo(() => {
+    const by = new Map<number, { id: number; kind: string; x: number; y: number }[]>();
+    for (const [id, b] of idx?.byId ?? []) {
+      const list = by.get(b.settlement);
+      if (list) list.push({ id, kind: b.kind, x: b.x, y: b.y });
+      else by.set(b.settlement, [{ id, kind: b.kind, x: b.x, y: b.y }]);
+    }
+    return by;
+  }, [idx]);
+
+  /** The woods each village has left, and where its boats work. Both change only with a new snapshot. */
+  const groves = useMemo(() => {
+    const map = new Map<number, Grove>();
+    if (!geo || !elevation) return map;
+    for (const s of geo.settlements) {
+      const land = landOf(s.land);
+      if (!land) continue;
+      const near = buildingsBy.get(s.id) ?? [];
+      map.set(s.id, groveOf(s, land.woods, s.biome, (x, y) => elevation(x, y) >= 0.02 && !near.some((b) => Math.abs(b.x - x) < 2.4 && Math.abs(b.y - y) < 2.4)));
+    }
+    return map;
+  }, [geo, elevation, buildingsBy]);
+  const boats = useMemo(() => {
+    const map = new Map<number, { x: number; y: number }[]>();
+    if (!geo || !elevation) return map;
+    for (const s of geo.settlements) if (s.land) map.set(s.id, boatSpots(s, elevation));
+    return map;
+  }, [geo, elevation]);
   const routes = useRef(new Map<string, { x: number; y: number }[]>());
   useEffect(() => routes.current.clear(), [roads]);
 
@@ -518,6 +529,58 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
         }
       }
 
+      // the land as it really is: fire scars, flood water, the woods that are left, smoke and boats
+      if (geo && c.z >= WILDLIFE_FROM_ZOOM) {
+        const lately = recentEvents();
+        const daylight = atmosphere.current?.value.daylight ?? 1;
+        const leaves = Math.exp(-(((yearFraction(tf) - 0.66) / 0.085) ** 2));
+        const winter = smooth(-0.1, -0.8, seasonCurve(tf));
+        const slot = Math.floor(tf * SLOTS_PER_TICK);
+        const reach = 62 * c.z;
+        for (const s of geo.settlements) {
+          const px = sx(s.x);
+          const py = sy(s.y);
+          if (px < -reach || py < -reach || px > W + reach || py > H + reach) continue;
+          const weather = weatherFor(s.id, s.x, s.y, slot);
+          const grove = groves.get(s.id);
+          const fire = lately.find((e) => e.kind === "nature" && e.settlement === s.id && e.data.kind === "wildfire");
+          const burnTick = Math.max(s.burn ?? -1, fire?.tick ?? -1);
+          const scar = burnScar(burnTick < 0 ? null : burnTick, tf);
+          drawBurn(ctx, px, py, c.z, scar);
+          const flood = lately.find((e) => e.kind === "weather" && e.settlement === s.id && (e.data.kind === "flood" || e.data.kind === "surge") && tf - e.tick < 16);
+          if (flood) {
+            const farm = buildingsBy.get(s.id)?.find((b) => b.kind === "farm");
+            drawFlood(ctx, sx(farm?.x ?? s.x + 6), sy(farm?.y ?? s.y + 4), 9 * c.z, Math.max(0.25, 1 - (tf - flood.tick) / 16), reducedMotion ? 0 : ts);
+          }
+          if (grove) {
+            drawGrove(ctx, grove, sx, sy, c.z, TURNING_LEAVES.has(s.biome ?? "") ? leaves : 0, weather.temp < 3 ? winter : 0, scar, W, H);
+            if (burnTick >= 0 && tf - burnTick < 8 && !reducedMotion) {
+              drawFlames(ctx, grove.stumps.filter((_, i) => i % 3 === 0).slice(0, 14).map((p) => ({ x: sx(p.x), y: sy(p.y) })), c.z, ts);
+            }
+          }
+          if (c.z >= SMOKE_FROM_ZOOM && !reducedMotion) {
+            // A fire burns in every lived-in home when it is cold, and at breakfast and supper.
+            const hour = localHour(tf, s.x);
+            const cold = weather.temp < 10;
+            if (cold || (hour >= 6 && hour < 8) || (hour >= 17 && hour < 20.5)) {
+              const puff = Math.max(2, c.z * 0.45);
+              for (const b of buildingsBy.get(s.id) ?? []) {
+                if (b.kind === "home" && homeNames.has(b.id)) drawSmoke(ctx, sx(b.x), sy(b.y) - c.z * 0.5, puff, ts + b.id * 913, cold ? 0.7 : 0.45);
+              }
+            }
+          }
+          const spots = boats.get(s.id);
+          if (spots?.length && c.z >= 3 && daylight > 0.3 && weather.wind < 45 && weather.kind !== "thunderstorm") {
+            const out = Math.min(spots.length, 1 + Math.floor(s.pop / 25));
+            for (let i = 0; i < out; i++) {
+              const a = tf / 5 + i * 2;
+              const b = tf / 7 + i;
+              drawBoat(ctx, sx(spots[i].x + 2.5 * Math.sin(a)), sy(spots[i].y + 1.5 * Math.cos(b)), Math.max(2, c.z * 0.5), Math.atan2(-1.5 * Math.sin(b) / 7, 2.5 * Math.cos(a) / 5));
+            }
+          }
+        }
+      }
+
       // the wild: herds, the animals that hunt them, the village's own animals, and birds overhead
       if (geo && elevation && c.z >= WILDLIFE_FROM_ZOOM) {
         const daylight = atmosphere.current?.value.daylight ?? 1;
@@ -702,7 +765,7 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
     };
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
-  }, [agents, elevation, geo, groups, hero, homeNames, idx, links, now?.tick, positionOf, roads, seed, selected, settlementById, follow, stops]);
+  }, [agents, boats, buildingsBy, elevation, geo, groups, groves, hero, homeNames, idx, links, now?.tick, positionOf, roads, seed, selected, settlementById, follow, stops, weatherFor]);
 
   // --- interaction ------------------------------------------------------------------
   const pointers = useRef(new Map<number, { x: number; y: number }>());
@@ -734,24 +797,113 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
     return () => el.removeEventListener("wheel", onWheel);
   }, []);
 
-  const pick = (px: number, py: number) => {
+  /** What is under the pointer: a person first, then an animal, a building, a village. */
+  const hitAt = (px: number, py: number): Hit | null => {
     const wrap = wrapRef.current!;
     const c = cam.current;
     const tf = currentTick() ?? now?.tick ?? 0;
+    const toX = (x: number) => (x - c.x) * c.z + wrap.clientWidth / 2;
+    const toY = (y: number) => (y - c.y) * c.z + wrap.clientHeight / 2;
     let best: Agent | null = null;
     let bd = 12 * 12;
     for (const a of agents) {
       const p = positionOf(a, tf);
-      const x = (p.x - c.x) * c.z + wrap.clientWidth / 2;
-      const y = (p.y - c.y) * c.z + wrap.clientHeight / 2;
-      const d = (x - px) ** 2 + (y - py) ** 2;
+      const d = (toX(p.x) - px) ** 2 + (toY(p.y) - py) ** 2;
       if (d < bd) {
         bd = d;
         best = a;
       }
     }
-    setSelected(best);
-    if (!best) setFollow(false);
+    if (best) return { type: "agent", agent: best };
+    const wx = (px - wrap.clientWidth / 2) / c.z + c.x;
+    const wy = (py - wrap.clientHeight / 2) / c.z + c.y;
+    if (geo && elevation && c.z >= WILDLIFE_FROM_ZOOM) {
+      const daylight = atmosphere.current?.value.daylight ?? 1;
+      let animal: { settlement: number; kind: CreatureKind } | null = null;
+      let ad = 11 * 11;
+      for (const s of geo.settlements) {
+        const land = landOf(s.land);
+        if (!land || Math.hypot(s.x - wx, s.y - wy) > 64) continue;
+        for (const a of wildlifeAt(s, land, tf, daylight, (x, y) => elevation(x, y) >= 0.02)) {
+          const d = (toX(a.x) - px) ** 2 + (toY(a.y) - py) ** 2;
+          if (d < ad) {
+            ad = d;
+            animal = { settlement: s.id, kind: a.kind };
+          }
+        }
+      }
+      if (animal) return { type: "creature", ...animal };
+    }
+    if (idx && c.z >= 2.5) {
+      for (const [id, b] of idx.byId) {
+        const half = Math.max(2, c.z * (b.kind === "home" ? 0.9 : 1.6)) / 2 + 3;
+        if (Math.abs(toX(b.x) - px) < half && Math.abs(toY(b.y) - py) < half) return { type: "building", id };
+      }
+    }
+    for (const s of geo?.settlements ?? []) {
+      const x = toX(s.x);
+      const y = toY(s.y);
+      const labelY = y - Math.max(10, c.z * 9) - 4;
+      if (Math.hypot(px - x, py - y) < 14 || (Math.abs(px - x) < 12 + s.name.length * 3.8 && Math.abs(py - labelY) < 9)) return { type: "village", id: s.id };
+    }
+    return null;
+  };
+
+  /** A short name for what the pointer is over, shown beside it. */
+  const nameOf = (hit: Hit): string => {
+    if (hit.type === "agent") return hit.agent.name;
+    if (hit.type === "village") return settlementById.get(hit.id)?.name ?? "A village";
+    if (hit.type === "building") {
+      const b = idx?.byId.get(hit.id);
+      return b?.kind === "home" ? homeNames.get(hit.id) ?? "An empty home" : PLACE_NAMES[b?.kind ?? ""] ?? "A building";
+    }
+    const f = faunaOf(settlementById.get(hit.settlement)?.biome);
+    const name = hit.kind === "grazer" ? f.grazer : hit.kind === "hunter" ? f.hunter : hit.kind === "herd" ? `the village ${f.herd}` : f.bird;
+    return name.charAt(0).toUpperCase() + name.slice(1);
+  };
+
+  const pick = (px: number, py: number) => {
+    const hit = hitAt(px, py);
+    if (hit?.type === "agent") {
+      setSelected(hit.agent);
+      setPicked(null);
+      return;
+    }
+    setSelected(null);
+    setFollow(false);
+    const tf = currentTick() ?? now?.tick ?? 0;
+    if (hit?.type === "village") {
+      const s = settlementById.get(hit.id);
+      setPicked(s ? { ...hit, weather: weatherFor(s.id, s.x, s.y, Math.floor(tf * SLOTS_PER_TICK)) } : null);
+    } else if (hit?.type === "building") {
+      const b = idx?.byId.get(hit.id);
+      const inside = !b ? [] : agents.filter((a) => {
+        if (a.settlement !== b.settlement) return false;
+        const p = positionOf(a, tf);
+        return !p.moving && Math.abs(p.x - b.x) < 1.6 && Math.abs(p.y - b.y) < 1.6;
+      });
+      setPicked({ ...hit, inside: inside.map((a) => ({ id: a.id, name: a.name })) });
+    } else {
+      setPicked(hit);
+    }
+  };
+
+  /** With a mouse, things that can be clicked say what they are before you click. */
+  const hover = (e: React.PointerEvent) => {
+    const tip = tipRef.current;
+    const canvas = canvasRef.current;
+    if (!tip || !canvas || e.pointerType !== "mouse") return;
+    const nowMs = performance.now();
+    if (nowMs - lastHover.current < 70) return;
+    lastHover.current = nowMs;
+    const rect = canvas.getBoundingClientRect();
+    const hit = hitAt(e.clientX - rect.left, e.clientY - rect.top);
+    canvas.style.cursor = hit ? "pointer" : "";
+    tip.hidden = !hit;
+    if (hit) {
+      tip.textContent = nameOf(hit);
+      tip.style.transform = `translate(${Math.round(e.clientX - rect.left + 14)}px, ${Math.round(e.clientY - rect.top + 12)}px)`;
+    }
   };
 
   const onPointerDown = (e: React.PointerEvent) => {
@@ -761,7 +913,11 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
   };
   const onPointerMove = (e: React.PointerEvent) => {
     const prev = pointers.current.get(e.pointerId);
-    if (!prev) return;
+    if (!prev) {
+      hover(e);
+      return;
+    }
+    if (tipRef.current) tipRef.current.hidden = true;
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointers.current.size === 2) {
       const [a, b] = [...pointers.current.values()];
@@ -790,8 +946,41 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
     }
   };
 
+  // --- sound: the weather and the hour at the village in view ---------------------------
+  const toggleSound = () => {
+    if (ambience.current) {
+      ambience.current.stop();
+      ambience.current = null;
+      setSound(false);
+      return;
+    }
+    ambience.current = startAmbience(); // must start inside the click
+    setSound(ambience.current !== null);
+  };
+  useEffect(() => {
+    if (!sound || !geo?.settlements.length) return;
+    const tune = () => {
+      const c = cam.current;
+      const tf = currentTick() ?? 0;
+      const near = geo.settlements.reduce((best, s) => (Math.hypot(s.x - c.x, s.y - c.y) < Math.hypot(best.x - c.x, best.y - c.y) ? s : best));
+      const weather = weatherFor(near.id, near.x, near.y, Math.floor(tf * SLOTS_PER_TICK));
+      const fire = recentEvents().some((e) => e.kind === "nature" && e.settlement === near.id && e.data.kind === "wildfire" && tf - e.tick < 8);
+      ambience.current?.set({ rain: weather.rain, wind: weather.wind, daylight: atmosphere.current?.value.daylight ?? 1, temp: weather.temp, fire });
+    };
+    tune();
+    const id = window.setInterval(tune, 2000);
+    return () => window.clearInterval(id);
+  }, [sound, geo, weatherFor]);
+  useEffect(() => () => ambience.current?.stop(), []);
+
+  const goTo = (id: number) => {
+    const s = settlementById.get(id);
+    if (s) cam.current = { x: s.x, y: s.y, z: Math.max(cam.current.z, 7) };
+  };
+
   const focusOn = useCallback((a: Agent) => {
     setSelected(a);
+    setPicked(null);
     setFollow(true);
     cam.current.z = Math.max(cam.current.z, 9);
     setNote(null);
@@ -855,8 +1044,18 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
         role="img"
       />
 
-      <div className="absolute right-3 top-3">
+      <div ref={tipRef} hidden className="pointer-events-none absolute left-0 top-0 z-10 rounded bg-bg/85 px-2 py-0.5 text-xs text-ink shadow" />
+
+      <div className="absolute right-3 top-3 flex flex-col items-end gap-2">
         <WorldClock />
+        <button
+          className="rounded-lg bg-bg/70 px-3 py-1.5 text-xs text-ink-2 hover:text-ink"
+          onClick={toggleSound}
+          aria-pressed={sound}
+          title="The sound of the village in view: wind, rain, birds by day, insects at night"
+        >
+          {sound ? "♪ Sound on" : "♪ Sound off"}
+        </button>
       </div>
 
       <div className="pointer-events-none absolute left-3 top-3 flex flex-col gap-2">
@@ -929,6 +1128,33 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
         )}
         {myPerson && <span className="text-god">◎ you</span>}
       </div>
+
+      {!selected && picked?.type === "village" && settlementById.get(picked.id) && (
+        <VillageCard
+          place={settlementById.get(picked.id)!}
+          weather={picked.weather}
+          events={[...events]}
+          onGo={() => goTo(picked.id)}
+          onClose={() => setPicked(null)}
+        />
+      )}
+      {!selected && picked?.type === "creature" && settlementById.get(picked.settlement) && (
+        <CreatureCard kind={picked.kind} place={settlementById.get(picked.settlement)!} onClose={() => setPicked(null)} />
+      )}
+      {!selected && picked?.type === "building" && idx?.byId.get(picked.id) && (
+        <BuildingCard
+          kind={idx.byId.get(picked.id)!.kind}
+          name={homeNames.get(picked.id) ?? null}
+          place={settlementById.get(idx.byId.get(picked.id)!.settlement)}
+          residents={agents.filter((a) => a.home === picked.id)}
+          inside={picked.inside}
+          onPerson={(id) => {
+            const a = agents.find((x) => x.id === id);
+            if (a) focusOn(a);
+          }}
+          onClose={() => setPicked(null)}
+        />
+      )}
 
       {selected && (
         <div className="panel absolute bottom-3 right-3 w-72 p-4 text-sm">

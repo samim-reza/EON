@@ -218,9 +218,18 @@ Around every village the database keeps a small ecosystem, updated once per EON 
   **herd of its own** that suffers in deep cold and drought.
 - **Fire** takes a hot, dry wood, **locusts** take a crop, and birds leave for the winter and return in spring.
 
-A small village lives well off hunting, fishing and its herd; a town has to farm. The map draws the herds
-grazing, the predators circling closer at night, the village animals penned after dark and birds overhead, all
-computed in the browser from a handful of numbers.
+A small village lives well off hunting, fishing and its herd; a town has to farm.
+
+**The map shows the land as it is**, computed in the browser from a handful of numbers: the woods a village has
+left and the stumps where they were cut, the black scar of a fire fading as the trees grow back, flood water on
+the fields, chimney smoke in the cold, boats on the sea by day, herds grazing, predators circling closer at night,
+the village animals penned after dark and birds overhead. **Everything answers a click**: a village (its people,
+weather, stores, country and latest news), an animal, a building (who lives there and who is inside right now). An
+optional soundscape, made in the browser, plays the weather and the hour of the village in view.
+
+**Players act on it.** Besides deeds with people, a person with a soul can hunt, fish, gather, cut firewood, plant
+trees and tend the herd. Each one changes the village's real numbers, so a village of players can hunt its deer out
+or grow its woods back.
 
 ### Voices
 
@@ -432,7 +441,7 @@ Copy `.env.example` to `.env.local`. Never commit real values.
 npm run lint && npm run typecheck
 npm test                      # Vitest: life table, fertility, calendar, climate, nature, key sealing, providers, a soul's mind, choices, emails
 npm run lab -- 10 300         # 10 worlds × 300 EON years, with pass/fail checks
-npx supabase test db          # pgTAP on a fresh database: 180 checks of the security model, engine, sign-up, souls, choices, keys, deeds and the living world
+npx supabase test db          # pgTAP on a fresh database: 185 checks of the security model, engine, sign-up, souls, choices, keys, deeds and the living world
 ```
 
 The lab asserts that worlds survive, life expectancy stays near 60, under-5 deaths stay around 3 %, no close-kin union
