@@ -13,7 +13,7 @@ import { useFocus, useResidents, useTick, useWorld } from "./world-time";
 const MAX_NAMED = 4; // beyond this, a place is described by what most people are doing
 
 /** What is going on at this moment, and what is about to. It is all derived in the browser. */
-export function RightNow({ initial = null, heading = true }: { initial?: NowState | null; heading?: boolean }) {
+export function RightNow({ initial = null, heading = true, land: landStyle = "list" }: { initial?: NowState | null; heading?: boolean; land?: "list" | "line" }) {
   const { now } = useWorld(initial);
   const tick = useTick();
   const focus = useFocus();
@@ -74,7 +74,12 @@ export function RightNow({ initial = null, heading = true }: { initial?: NowStat
           </li>
         ))}
       </ul>
-      {country.length > 0 && (
+      {country.length > 0 && landStyle === "line" && (
+        <p className="mt-2 text-xs text-ink-3">
+          {country.filter((line) => line.label !== "Soil" && line.label !== "Fish").slice(0, 3).map((line) => `${line.label}: ${line.text.toLowerCase()}`).join(" · ")}
+        </p>
+      )}
+      {country.length > 0 && landStyle === "list" && (
         <>
           <h3 className="mt-2 text-xs uppercase tracking-widest text-ink-3">The land</h3>
           <ul className="mt-1 space-y-0.5 text-xs text-ink-2">

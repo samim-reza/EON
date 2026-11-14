@@ -66,7 +66,7 @@ export default async function Home() {
               </span>
             </div>
             <div className="mb-2 border-b border-line/60 pb-3 empty:hidden">
-              <RightNow initial={now} />
+              <RightNow initial={now} land="line" />
             </div>
             {now?.genesis ? (
               <LiveFeed initial={feed} importance={1} limit={3} />
