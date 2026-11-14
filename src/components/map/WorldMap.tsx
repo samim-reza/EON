@@ -526,6 +526,9 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
       const { visible } = scratch;
       visible.length = 0;
       placeIndex.within(view.x0 - 64, view.y0 - 64, view.x1 + 64, view.y1 + 64, (s) => visible.push(s));
+      scratch.wildlife.reset();
+      scratch.smoke.reset();
+      scratch.cold.reset();
       if (!hero && ts - lastFocusCheck > 700 && geo?.settlements.length) {
         lastFocusCheck = ts;
         const nearest = geo.settlements.reduce((best, s) => (Math.hypot(s.x - c.x, s.y - c.y) < Math.hypot(best.x - c.x, best.y - c.y) ? s : best));
@@ -631,9 +634,6 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
           if (px > -8 && py > -8 && px < W + 8 && py < H + 8) wildlife.add(kind, px, py, heading);
         };
         let woods = 0;
-        wildlife.reset();
-        smoke.reset();
-        coldSmoke.reset();
         for (const s of visible) {
           const here = lands.get(s.id);
           if (!here) continue;
@@ -690,9 +690,6 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
             }
           }
         }
-        const puff = Math.max(2, c.z * 0.45);
-        smoke.draw(ctx, puff, ts, 0.45);
-        coldSmoke.draw(ctx, puff, ts, 0.7);
         wildlife.draw(ctx, unit);
       }
 
@@ -718,6 +715,12 @@ export function WorldMap({ variant = "full" }: { variant?: "full" | "hero" }) {
           ctx.globalAlpha = 1;
           ctx.globalCompositeOperation = "source-over";
         }
+      }
+      // Chimney smoke goes on top of the dark, so a cold night still shows who has a fire lit.
+      if (c.z >= SMOKE_FROM_ZOOM) {
+        const puff = Math.max(2, c.z * 0.45);
+        scratch.smoke.draw(ctx, puff, ts, 0.8);
+        scratch.cold.draw(ctx, puff, ts, 1.1);
       }
 
       // agents
